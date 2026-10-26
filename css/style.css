@@ -25,3 +25,4 @@ main{flex:1;border-top:1px solid #c5d5e8;padding:6px 0}
 #er{color:#b3261e}.qr{display:flex;gap:10px;align-items:center;margin:6px 0}.qr img{width:120px;height:120px;border:1px solid #9ab3cf}
 .ok{color:#1d7a1d;font-weight:700}.bad{color:#b3261e;font-weight:700}#bd{color:#c4442a}
 #ad{padding:10px;text-align:center;font-size:11px;color:#5b7391;border-top:1px solid #c5d5e8;background:#eef4fb}
+.sp{color:#5b7391;margin:2px 0 6px;min-height:1em}.sg{margin-top:8px;border-top:1px dashed #c5d5e8;padding-top:2px}.sm{margin:4px 0 0}.grp #rf{margin-left:8px;font-weight:400;padding:2px 8px}
