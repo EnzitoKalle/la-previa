@@ -99,7 +99,9 @@ async function admin(){
   main.onclick=async e=>{const b=e.target.closest('[data-id]');if(b){await sb.from('requests').update({status:b.dataset.st}).eq('id',b.dataset.id);admin();badge()}};
   $('#sc').onclick=scan}
 function scan(){
-  const h=new Html5Qrcode('rd'),res=$('#res');res.textContent='';
+  const res=$('#res');res.textContent='';
+  if(typeof Html5Qrcode==='undefined')return res.innerHTML='<p class="bad">La librería del escáner no cargó. Revisá tu conexión y recargá la página.</p>';
+  const h=new Html5Qrcode('rd');
   h.start({facingMode:'environment'},{fps:10,qrbox:220},async txt=>{
     await h.stop();const{data:t,error}=await sb.from('tickets').select('*,requests(status)').eq('qr_code',txt).maybeSingle();
     if(error||!t||t.requests?.status!='approved')res.innerHTML='<p class="bad">❌ QR inválido</p>';
