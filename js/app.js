@@ -67,8 +67,10 @@ async function mine(){
     <div class="sg"><label>🎵 Tu canción</label><div>${yt(r.song_url)?`<a href="${esc(r.song_url)}" target="_blank" rel="noopener">${esc(r.song_title)}</a>`:esc(r.song_title)}</div>
     <input data-su="${r.id}" value="${esc(r.song_url)}" placeholder="Nuevo enlace de YouTube"><button data-sv="${r.id}">Cambiar canción</button><p class="sm" data-sm="${r.id}"></p></div></div>`).join('')||'<p class="ct">Todavía no pediste entradas.</p>');
   document.querySelectorAll('[data-q]').forEach(async i=>{
-    try{const u=await QRCode.toDataURL(i.dataset.q,{width:600,margin:3});qrUrls[i.dataset.q]=u;i.src=u}
-    catch(e){console.error('QR',e);const s=document.createElement('span');s.className='bad';s.textContent='No se pudo generar el QR. Recargá la página.';i.replaceWith(s)}});
+    try{
+      if(typeof QRCode==='undefined'||typeof QRCode.toDataURL!=='function')throw new Error('la librería de QR no cargó (typeof QRCode = '+typeof QRCode+')');
+      const u=await QRCode.toDataURL(i.dataset.q,{width:600,margin:3});qrUrls[i.dataset.q]=u;i.src=u}
+    catch(e){console.error('QR',e);const s=document.createElement('span');s.className='bad';s.textContent='No se pudo generar el QR: '+((e&&e.message)||e);i.replaceWith(s)}});
   main.onclick=e=>{const b=e.target.closest('button');if(!b)return;
     if(b.dataset.s)share(b.dataset.s,b.dataset.n);else if(b.dataset.sv)saveSong(b.dataset.sv);else if(b.id=='rf')mine()}}
 async function saveSong(id){
