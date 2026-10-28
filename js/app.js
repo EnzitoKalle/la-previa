@@ -10,6 +10,7 @@ const dataFile=(u,n)=>{const b=atob(u.split(',')[1]),a=new Uint8Array(b.length);
 const qrUrls={};
 let user=null,view='home',ready=0,last=null,selEv=null,afterV=null,EV=[],AEV=[];
 const isAdmin=()=>user&&user.email===C.ADMIN_EMAIL;
+const mark=()=>document.querySelectorAll('#mb a').forEach(a=>a.classList.toggle('on',a.dataset.v===(view==='list'?'home':view)));
 const fdate=d=>d.toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'});
 const fshort=d=>d.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',...(d.getFullYear()!=new Date().getFullYear()?{year:'numeric'}:{})});
 const ftime=d=>d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',hour12:false})+' hs';
@@ -35,9 +36,9 @@ function head(){
   $('#mb').onclick=e=>{const v=e.target.closest('a')?.dataset.v;if(v)go(v)};
   $('#me').innerHTML=user?`${esc(user.user_metadata?.full_name||user.email)} · <a id="out">Salir</a>`:'<button class="bt" id="in">Iniciar sesión</button> <button class="bt" id="up">Registrarse</button>';
   if($('#out'))$('#out').onclick=()=>sb.auth.signOut();
-  if($('#in'))$('#in').onclick=()=>authView('login');if($('#up'))$('#up').onclick=()=>authView('signup');badge()}
+  if($('#in'))$('#in').onclick=()=>authView('login');if($('#up'))$('#up').onclick=()=>authView('signup');mark();badge()}
 $('#cta').onclick=()=>want(null);
-function go(v){view=v;main.onclick=null;({home:home,list:home,form:()=>want(selEv),mine:mine,admin:admin,auth:()=>authView('login'),recover:recoverView}[v]||home)()}
+function go(v){view=v;mark();main.onclick=null;({home:home,list:home,form:()=>want(selEv),mine:mine,admin:admin,auth:()=>authView('login'),recover:recoverView}[v]||home)()}
 
 /* ---------- eventos ---------- */
 async function loadEvents(){
@@ -46,12 +47,12 @@ async function loadEvents(){
 const upcoming=()=>EV.filter(e=>e.d.getTime()>Date.now()-12*36e5);
 function updateCta(){const u=upcoming(),b=$('#cta'),all=u.length>0&&u.every(e=>e.sold_out);b.textContent=all?'ENTRADAS AGOTADAS':'QUIERO UNA ENTRADA';b.disabled=all}
 const lowTxt=n=>n==1?'¡Última entrada disponible!':`¡Últimas ${n} entradas disponibles!`;
-const evCard=e=>`<div class="box ev"><b>🎉 ${esc(e.name)}</b><br>📅 ${esc(fdate(e.d))} · 🕘 ${ftime(e.d)}`+
-  (e.sold_out?'<div class="bad big">AGOTADAS</div>':(e.remaining_low?`<div class="low">🔥 ${lowTxt(e.remaining_low)}</div>`:'')+`<div><button data-ev="${e.id}">Quiero una entrada</button></div>`)+`</div>`;
+const evCard=e=>`<div class="box ev"><div class="evn">🎉 ${esc(e.name)}</div><div class="evd"><span>📅 ${esc(fdate(e.d))}</span><span>🕘 ${ftime(e.d)}</span></div>`+
+  (e.sold_out?'<div class="pill red">AGOTADAS</div>':(e.remaining_low?`<div class="pill hot">🔥 ${lowTxt(e.remaining_low)}</div><br>`:'')+`<button data-ev="${e.id}">Quiero una entrada</button>`)+`</div>`;
 
 /* ---------- registro / ingreso ---------- */
 function authView(mode='login',notice='',after=null){
-  view='auth';afterV=after;const su=mode=='signup';
+  view='auth';mark();afterV=after;const su=mode=='signup';
   main.innerHTML=`<div class="box">${notice?`<p class="note">${esc(notice)}</p>`:''}
   <div class="tabs"><a data-m="login" class="${su?'':'on'}">Iniciar sesión</a><a data-m="signup" class="${su?'on':''}">Crear cuenta</a></div>
   <form id="af" novalidate>${su?'<label>Tu nombre</label><input id="an" autocomplete="name" maxlength="30" placeholder="Cómo te van a ver en la lista">':''}
@@ -82,7 +83,7 @@ function authView(mode='login',notice='',after=null){
       if(error){$('#ab').disabled=false;return aer(authErr(error))}
     }}}
 function recoverView(){
-  view='recover';main.onclick=null;
+  view='recover';mark();main.onclick=null;
   main.innerHTML=`<div class="box"><b>Elegí una nueva contraseña</b><form id="rf2" novalidate><label>Nueva contraseña</label><input id="np" type="password" autocomplete="new-password" placeholder="Mínimo 6 caracteres"><button type="submit">Guardar</button><p id="rer"></p></form></div>`;
   $('#rf2').onsubmit=async e=>{e.preventDefault();const p=$('#np').value;
     if(p.length<6){$('#rer').className='bad';return $('#rer').textContent='La contraseña debe tener al menos 6 caracteres.'}
@@ -106,7 +107,7 @@ async function want(id){
   if(!e)return go('home');
   selEv=e.id;
   if(!user)return authView('signup','Registrate para que te quede guardado el QR de tu entrada. Si no te registrás, no podemos guardártelo.','form');
-  view='form';main.onclick=null;renderForm(e)}
+  view='form';mark();main.onclick=null;renderForm(e)}
 async function renderForm(ev){
   const{data:p}=await sb.from('profiles').select('display_name').eq('id',user.id).maybeSingle();
   const max=Math.min(10,ev.remaining_low||10);
@@ -180,33 +181,52 @@ function share(code,name){
   const alt=()=>{const a=document.createElement('a');a.href=u;a.download=f.name;a.click();window.open('https://wa.me/?text='+encodeURIComponent(txt+' (te adjunto el QR)'),'_blank')};
   if(navigator.canShare&&navigator.canShare({files:[f]}))navigator.share({files:[f],title:'Entrada La Previa',text:txt}).catch(e=>{if(e.name!='AbortError')alt()});
   else alt()}
+let editId=null;
+const loc=d=>{const p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`};
 async function admin(){
   if(!isAdmin())return home();
-  const[rq,ev]=await Promise.all([sb.from('requests').select('*,profiles(display_name),tickets(*)').order('created_at',{ascending:false}),sb.from('events').select('*').order('event_at')]);
+  const[rq,ev,jk]=await Promise.all([sb.from('requests').select('*,profiles(display_name),tickets(*)').order('created_at',{ascending:false}),sb.from('events').select('*').order('event_at'),sb.from('jukebox').select('*').order('created_at')]);
   const data=rq.data||[];AEV=(ev.data||[]).map(e=>({...e,d:new Date(e.event_at)}));
   const evName=id=>{const e=AEV.find(x=>x.id==id);return e?`${esc(e.name)} del ${fshort(e.d)}`:'Sin evento'};
   const sum=(id,st)=>data.filter(r=>(r.event_id||null)==id&&r.status==st).reduce((a,r)=>a+r.quantity,0);
-  const stat=e=>{const s=sum(e.id,'approved'),p=sum(e.id,'pending');return `<div class="ct"><span><b>${esc(e.name)}</b> · ${fshort(e.d)} ${ftime(e.d)}<br>Vendidas ${s} de ${e.capacity} · Quedan ${Math.max(e.capacity-s,0)} · Pendientes ${p}</span></div>`};
+  const stat=e=>{const s=sum(e.id,'approved'),p=sum(e.id,'pending');return `<div class="ct"><span><b>${esc(e.name)}</b> · ${fshort(e.d)} ${ftime(e.d)}<br>Vendidas ${s} de ${e.capacity} · Quedan ${Math.max(e.capacity-s,0)} · Pendientes ${p}</span><button class="ed" data-ed="${e.id}">✏️ Editar</button></div>`};
   const pe=data.filter(r=>r.status=='pending');
   const sold=[...AEV,{id:null,name:'Sin evento'}].map(e=>{const ap=data.filter(r=>r.status=='approved'&&(r.event_id||null)==(e.id||null));if(!ap.length)return'';
     const tk=ap.flatMap(r=>r.tickets),ing=tk.filter(t=>t.checked_in).length;
     return `<div class="grp">${esc(e.name)}${e.d?' '+fshort(e.d):''} — vendidas ( ${ing} / ${tk.length} ingresaron )</div>`+ap.map(r=>r.tickets.map(t=>`<div class="ct"><input type="checkbox" disabled ${t.checked_in?'checked':''}> ${esc(t.holder_name)} <small>(${esc(r.profiles?.display_name)})</small></div>`).join('')).join('')}).join('');
+  const cur=AEV.find(e=>e.id==editId);if(!cur)editId=null;
   main.innerHTML=`<div class="box"><button id="sc">📷 Escanear entrada</button><div id="rd"></div><div id="res"></div></div>
-  <div class="box"><b>➕ Crear evento</b><label>Nombre</label><input id="en" value="La Previa" maxlength="60"><label>Fecha y hora</label><input id="ed" type="datetime-local"><label>Cantidad de entradas a la venta</label><input id="ec" type="number" min="1" inputmode="numeric" placeholder="Ej: 150"><button id="ecb">Crear evento</button><p id="eer"></p></div>
+  <div class="box" id="evf"><b>${cur?'✏️ Editar evento':'➕ Crear evento'}</b><label>Nombre</label><input id="en" value="${esc(cur?cur.name:'La Previa')}" maxlength="60"><label>Fecha y hora</label><input id="ed" type="datetime-local" value="${cur?loc(cur.d):''}"><label>Cantidad de entradas a la venta</label><input id="ec" type="number" min="1" inputmode="numeric" placeholder="Ej: 150" value="${cur?cur.capacity:''}"><button id="ecb">${cur?'Guardar cambios':'Crear evento'}</button>${cur?' <button id="ecc">Cancelar</button>':''}<p id="eer" class="bad"></p></div>
   <div class="grp">Eventos</div>${ev.error?`<p class="bad ct">Falta ejecutar eventos.sql en Supabase (${esc(ev.error.message)})</p>`:AEV.map(stat).join('')||'<p class="ct">Todavía no creaste ningún evento.</p>'}
+  <div class="box"><b>🎶 Rocola</b><p class="sm">Pegá uno o varios enlaces de YouTube (uno por línea). En la página suena una canción al azar y pasa a la siguiente cuando termina.</p><textarea id="jl" rows="3" placeholder="https://www.youtube.com/watch?v=..."></textarea><button id="jla">Agregar a la rocola</button><p id="jer" class="bad"></p>${jk.error?`<p class="bad">Falta ejecutar rocola.sql en Supabase (${esc(jk.error.message)})</p>`:(jk.data||[]).map(x=>`<div class="ct"><span>♪ ${esc(x.title)}</span><button class="ed" data-jd="${x.id}">✕</button></div>`).join('')||'<p class="sm">Todavía no agregaste canciones.</p>'}</div>
   <div class="grp">Pendientes ( ${pe.length} )</div>`+
-  pe.map(r=>`<div class="box"><b>${esc(r.profiles?.display_name)}</b> · ${r.quantity} entrada(s) · <small>${evName(r.event_id)}</small><br>${r.tickets.map(t=>esc(t.holder_name)).join(', ')}<br>♪ ${esc(r.song_title)}<br><button data-id="${r.id}" data-st="approved">Aprobar</button> <button data-id="${r.id}" data-st="rejected">Rechazar</button></div>`).join('')+sold;
-  main.onclick=async e=>{const b=e.target.closest('[data-id]');if(!b)return;b.disabled=true;
+  pe.map(r=>`<div class="box"><b>${esc(r.profiles?.display_name)}</b> · ${r.quantity} entrada(s) · <small>${evName(r.event_id)}</small><br>${r.tickets.map(t=>esc(t.holder_name)).join(', ')}<br>♪ ${esc(r.song_title)}<br><br><button data-id="${r.id}" data-st="approved">Aprobar</button> <button data-id="${r.id}" data-st="rejected">Rechazar</button></div>`).join('')+sold;
+  main.onclick=async e=>{
+    const ed=e.target.closest('[data-ed]');if(ed){editId=ed.dataset.ed;await admin();$('#evf').scrollIntoView({behavior:'smooth',block:'center'});return}
+    const jd=e.target.closest('[data-jd]');if(jd){jd.disabled=true;const r=await sb.from('jukebox').delete().eq('id',jd.dataset.jd);if(r.error)console.error(r.error);await loadJuke();return admin()}
+    const b=e.target.closest('[data-id]');if(!b)return;b.disabled=true;
     const r=b.dataset.st=='approved'?await sb.rpc('approve_request',{p_request_id:String(b.dataset.id)}):await sb.from('requests').update({status:b.dataset.st}).eq('id',b.dataset.id);
     if(r.error){console.error(r.error);alert(/sold_out/.test(r.error.message)?'No quedan entradas suficientes en ese evento para aprobar esta solicitud.':'No se pudo actualizar. Probá de nuevo.')}
     admin();badge()};
   $('#ecb').onclick=async()=>{
     const n=$('#en').value.trim(),d=$('#ed').value,c=parseInt($('#ec').value,10),er=m=>$('#eer').textContent=m;
     if(!n||!d||!(c>0))return er('Completá nombre, fecha y hora, y una cantidad mayor a 0.');
-    $('#ecb').disabled=true;
-    const{error}=await sb.from('events').insert({name:n,event_at:new Date(d).toISOString(),capacity:c});
-    if(error){console.error(error);$('#ecb').disabled=false;return er('No se pudo crear el evento ('+error.message+')')}
-    admin()};
+    if(editId){const v=sum(editId,'approved');if(c<v)return er(`Ya aprobaste ${v} entradas: la cantidad no puede ser menor a eso.`)}
+    $('#ecb').disabled=true;const row={name:n,event_at:new Date(d).toISOString(),capacity:c};
+    const{error}=editId?await sb.from('events').update(row).eq('id',editId):await sb.from('events').insert(row);
+    if(error){console.error(error);$('#ecb').disabled=false;return er('No se pudo guardar el evento ('+error.message+')')}
+    editId=null;admin()};
+  if($('#ecc'))$('#ecc').onclick=()=>{editId=null;admin()};
+  $('#jla').onclick=async()=>{
+    const er=(m,c='bad')=>{$('#jer').className=c;$('#jer').textContent=m},urls=$('#jl').value.split(/\s+/).filter(Boolean),seen=new Set((jk.data||[]).map(x=>vidId(x.url)));
+    if(!urls.length)return er('Pegá al menos un enlace de YouTube.');
+    const ok=urls.filter(u=>{const v=vidId(u);if(!yt(u)||!v||seen.has(v))return false;seen.add(v);return true});
+    if(!ok.length)return er('Esos enlaces no son válidos o ya están en la rocola.');
+    $('#jla').disabled=true;er('Buscando los títulos…','sm');
+    const rows=await Promise.all(ok.map(async u=>({url:u,title:(await getTitle(u))||'Canción de YouTube'})));
+    const{error}=await sb.from('jukebox').insert(rows);
+    if(error){console.error(error);$('#jla').disabled=false;return er('No se pudo agregar ('+error.message+')')}
+    await loadJuke();admin()};
   $('#sc').onclick=scan}
 const otherEv=t=>{const e=AEV.find(x=>x.id==t.requests?.event_id);return e&&Math.abs(Date.now()-e.d.getTime())>24*36e5?e:null};
 function scan(){
@@ -225,12 +245,49 @@ async function badge(){
   if($('#bd'))$('#bd').textContent=count?` (${count})`:'';document.title=(count?`(${count}) `:'')+'La Previa';
   if(last!==null&&count>last)alert('🔔 Nueva solicitud de entradas');last=count}
 setInterval(badge,30000);
-const vid=(C.MUSIC_URL.match(/(?:v=|youtu\.be\/)([\w-]{11})/)||[])[1];
-if(vid){
-  let on=0,armed=1;
-  const set=v=>{on=v;$('#mp').innerHTML=on?`<iframe width="1" height="1" allow="autoplay" src="https://www.youtube.com/embed/${vid}?autoplay=1&loop=1&playlist=${vid}"></iframe>`:'';$('#mu').textContent=on?'⏸ Pausar música':'♫ Activar música'};
-  $('#music').innerHTML='<button id="mu">♫ Activar música</button>';
-  $('#mu').onclick=()=>{armed=0;set(!on)};
-  /* Los navegadores no permiten sonido sin que la persona toque algo: arranca con el primer toque en cualquier lado */
-  const kick=e=>{if(!armed)return;armed=0;if(e.target.closest&&e.target.closest('#music'))return;set(1)};
-  document.addEventListener('pointerdown',kick);document.addEventListener('keydown',kick)}
+/* ---------- rocola: canciones al azar, solo suena cuando la persona toca ▶ ---------- */
+const vidId=u=>(String(u).match(/(?:v=|youtu\.be\/|shorts\/|embed\/)([\w-]{11})/)||[])[1];
+const jb={list:[],bag:[],cur:null,pl:null,on:false,fails:0,q:[],api:0,timer:0,err:''};
+function loadYT(){if(jb.api||(window.YT&&YT.Player))return;jb.api=1;
+  window.onYouTubeIframeAPIReady=()=>{jb.q.splice(0).forEach(f=>f())};
+  const t=document.createElement('script');t.src='https://www.youtube.com/iframe_api';t.onerror=()=>{jb.api=0;jb.err='No se pudo cargar el reproductor.';drawJuke()};document.head.appendChild(t)}
+const ytReady=f=>{if(window.YT&&YT.Player)f();else{jb.q.push(f);loadYT()}};
+function pick(){
+  if(!jb.list.length)return null;
+  if(!jb.bag.length){
+    const a=jb.list.map((_,i)=>i);for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}
+    if(a.length>1&&jb.cur&&jb.list[a[a.length-1]].url===jb.cur.url)[a[0],a[a.length-1]]=[a[a.length-1],a[0]];
+    jb.bag=a}
+  return jb.list[jb.bag.pop()]}
+function playSong(s){
+  if(!s)return;jb.cur=s;jb.err='';drawJuke();clearTimeout(jb.timer);const id=vidId(s.url);
+  ytReady(()=>{
+    if(jb.pl&&jb.pl.loadVideoById){jb.pl.loadVideoById(id);return}
+    $('#mp').innerHTML='<div id="yp"></div>';
+    jb.pl=new YT.Player('yp',{width:1,height:1,videoId:id,playerVars:{autoplay:1,playsinline:1,rel:0},events:{
+      onReady:e=>e.target.playVideo(),
+      onStateChange:e=>{const st=e.data;
+        if(st===1){jb.on=true;jb.fails=0;jb.err='';clearTimeout(jb.timer)}
+        else if(st===2)jb.on=false;
+        else if(st===0){jb.on=false;playSong(pick())}
+        drawJuke()},
+      onError:()=>{jb.fails++;if(jb.fails<jb.list.length)playSong(pick());else{jb.on=false;jb.err='No se pudieron reproducir las canciones.';drawJuke()}}}})});
+  jb.timer=setTimeout(()=>{if(!jb.on){jb.err='Tocá ▶ para empezar';drawJuke()}},5000)}
+function drawJuke(){
+  const m=$('#music');
+  if(!jb.list.length){m.innerHTML='';return}
+  if(!$('#juke')){
+    m.innerHTML='<div id="juke"><span class="jn">♫</span><div class="jtx"><small>Rocola</small><span id="jt"></span></div><button id="jp"></button><button id="jx" title="Otra canción">⏭</button></div>';
+    $('#jp').onclick=()=>{if(!jb.cur)return playSong(pick());if(!jb.pl)return;if(jb.on)jb.pl.pauseVideo();else jb.pl.playVideo()};
+    $('#jx').onclick=()=>playSong(pick())}
+  $('#juke').classList.toggle('play',jb.on);
+  $('#jt').textContent=jb.err||(jb.cur?(jb.on?'Escuchando: ':'En pausa: ')+jb.cur.title:'Tocá ▶ para escuchar música');
+  $('#jp').textContent=jb.on?'⏸':'▶';$('#jp').title=jb.on?'Pausar':'Escuchar'}
+async function loadJuke(){
+  const{data,error}=await sb.from('jukebox').select('*').order('created_at');
+  if(error)console.error('rocola',error);
+  let l=(data||[]).filter(x=>vidId(x.url));
+  if(!l.length&&vidId(C.MUSIC_URL||''))l=[{id:'cfg',url:C.MUSIC_URL,title:'Música de La Previa'}];
+  if(!l.length&&jb.pl){try{jb.pl.stopVideo()}catch(e){}jb.on=false;jb.cur=null}
+  jb.list=l;jb.bag=[];drawJuke();if(l.length)loadYT()}
+loadJuke();
