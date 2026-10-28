@@ -7,5 +7,5 @@ window.CFG = {
   PHONE: "2262541305", // se muestra en "Contactos"
   INSTAGRAM: "", // cuando lo tengas: usuario (ej: laprevia) o el enlace completo
   MUSIC_URL: "PONER_ENLACE_DE_YOUTUBE_AQUI", // ej: https://www.youtube.com/watch?v=XXXXXXXXXXX
-  STATUS_MSG: "Fiesta +30 · ¡Anotate y poné tu canción!"
+  STATUS_MSG: "Para los nacidos en los 80´s y 90´s"
 };
