@@ -8,26 +8,111 @@ const getTitle=async u=>{
   }return''};
 const dataFile=(u,n)=>{const b=atob(u.split(',')[1]),a=new Uint8Array(b.length);for(let i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return new File([a],n,{type:'image/png'})};
 const qrUrls={};
-let user=null,view='home',ready=0,last=null;
+let user=null,view='home',ready=0,last=null,selEv=null,afterV=null,EV=[],AEV=[];
 const isAdmin=()=>user&&user.email===C.ADMIN_EMAIL;
-const login=()=>sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin}});
+const fdate=d=>d.toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'});
+const fshort=d=>d.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',...(d.getFullYear()!=new Date().getFullYear()?{year:'numeric'}:{})});
+const ftime=d=>d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',hour12:false})+' hs';
+const google=()=>{try{sessionStorage.setItem('lp_after',afterV||'');sessionStorage.setItem('lp_ev',selEv||'')}catch(e){}return sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin}})};
+const authErr=e=>{const m=String(e&&e.message||e);
+  if(/already registered|already been registered/i.test(m))return'Ese email ya tiene una cuenta. Tocá "Iniciar sesión".';
+  if(/invalid login/i.test(m))return'Email o contraseña incorrectos.';
+  if(/not confirmed/i.test(m))return'Tenés que confirmar tu email. Revisá tu casilla (y el spam).';
+  if(/rate limit|too many|seconds/i.test(m))return'Hay muchos intentos seguidos. Esperá un ratito y probá de nuevo.';
+  if(/password/i.test(m))return'La contraseña debe tener al menos 6 caracteres.';
+  return'No se pudo completar. Probá de nuevo.'};
 $('#msg').textContent=C.STATUS_MSG;
-sb.auth.onAuthStateChange((_,s)=>{const u=s?s.user:null;if(ready&&(u&&u.id)===(user&&user.id))return;user=u;ready=1;head();go(view)});
+sb.auth.onAuthStateChange((ev,s)=>{
+  const u=s?s.user:null;
+  if(ev==='PASSWORD_RECOVERY'){user=u;ready=1;head();setTimeout(recoverView,0);return}
+  if(ready&&(u&&u.id)===(user&&user.id))return;
+  user=u;ready=1;
+  if(u){try{const a=sessionStorage.getItem('lp_after');if(a){view=a;selEv=sessionStorage.getItem('lp_ev')||null}sessionStorage.removeItem('lp_after');sessionStorage.removeItem('lp_ev')}catch(e){}
+    if(view==='auth'||view==='recover'){view=afterV||'home';afterV=null}}
+  head();setTimeout(()=>go(view),0)});
 function head(){
-  $('#mb').innerHTML=[['home','Archivo'],['list','Contactos'],['form','Acciones'],['mine','Mis entradas']].concat(isAdmin()?[['admin','Admin<span id="bd"></span>']]:[]).map(([v,t])=>`<a data-v="${v}">${t}</a>`).join('');
+  $('#mb').innerHTML=[['home','Archivo'],['list','Contactos'],['form','Quiero una entrada'],['mine','Mis entradas']].concat(isAdmin()?[['admin','Admin<span id="bd"></span>']]:[]).map(([v,t])=>`<a data-v="${v}">${t}</a>`).join('');
   $('#mb').onclick=e=>{const v=e.target.closest('a')?.dataset.v;if(v)go(v)};
-  $('#me').innerHTML=user?`${esc(user.user_metadata?.full_name||user.email)} · <a id="out">Salir</a>`:'<a id="in">Iniciar sesión con Google</a>';
-  if($('#out'))$('#out').onclick=()=>sb.auth.signOut();if($('#in'))$('#in').onclick=login;badge()}
-$('#cta').onclick=()=>go('form');
-function go(v){view=v;main.onclick=null;({home:home,list:home,form:form,mine:mine,admin:admin}[v]||home)()}
+  $('#me').innerHTML=user?`${esc(user.user_metadata?.full_name||user.email)} · <a id="out">Salir</a>`:'<button class="bt" id="in">Iniciar sesión</button> <button class="bt" id="up">Registrarse</button>';
+  if($('#out'))$('#out').onclick=()=>sb.auth.signOut();
+  if($('#in'))$('#in').onclick=()=>authView('login');if($('#up'))$('#up').onclick=()=>authView('signup');badge()}
+$('#cta').onclick=()=>want(null);
+function go(v){view=v;main.onclick=null;({home:home,list:home,form:()=>want(selEv),mine:mine,admin:admin,auth:()=>authView('login'),recover:recoverView}[v]||home)()}
+
+/* ---------- eventos ---------- */
+async function loadEvents(){
+  const{data,error}=await sb.rpc('get_events');if(error)console.error('eventos',error);
+  EV=(data||[]).map(e=>({...e,d:new Date(e.event_at)}));updateCta();return EV}
+const upcoming=()=>EV.filter(e=>e.d.getTime()>Date.now()-12*36e5);
+function updateCta(){const u=upcoming(),b=$('#cta'),all=u.length>0&&u.every(e=>e.sold_out);b.textContent=all?'ENTRADAS AGOTADAS':'QUIERO UNA ENTRADA';b.disabled=all}
+const lowTxt=n=>n==1?'¡Última entrada disponible!':`¡Últimas ${n} entradas disponibles!`;
+const evCard=e=>`<div class="box ev"><b>🎉 ${esc(e.name)}</b><br>📅 ${esc(fdate(e.d))} · 🕘 ${ftime(e.d)}`+
+  (e.sold_out?'<div class="bad big">AGOTADAS</div>':(e.remaining_low?`<div class="low">🔥 ${lowTxt(e.remaining_low)}</div>`:'')+`<div><button data-ev="${e.id}">Quiero una entrada</button></div>`)+`</div>`;
+
+/* ---------- registro / ingreso ---------- */
+function authView(mode='login',notice='',after=null){
+  view='auth';afterV=after;const su=mode=='signup';
+  main.innerHTML=`<div class="box">${notice?`<p class="note">${esc(notice)}</p>`:''}
+  <div class="tabs"><a data-m="login" class="${su?'':'on'}">Iniciar sesión</a><a data-m="signup" class="${su?'on':''}">Crear cuenta</a></div>
+  <form id="af" novalidate>${su?'<label>Tu nombre</label><input id="an" autocomplete="name" maxlength="30" placeholder="Cómo te van a ver en la lista">':''}
+  <label>Email</label><input id="ae" type="email" autocomplete="email" inputmode="email">
+  <label>Contraseña</label><input id="ap" type="password" autocomplete="${su?'new-password':'current-password'}" placeholder="Mínimo 6 caracteres">
+  <button id="ab" type="submit">${su?'Crear cuenta':'Ingresar'}</button><p id="aer"></p></form>
+  ${su?'':'<p><a id="fg" class="lk">Olvidé mi contraseña</a></p>'}
+  <hr><button id="gg" type="button">Seguir con Google</button></div>`;
+  const aer=(t,c='bad')=>{$('#aer').className=c;$('#aer').textContent=t};
+  main.onclick=e=>{const a=e.target.closest('[data-m]');if(a)authView(a.dataset.m,notice,after)};
+  $('#gg').onclick=google;
+  if($('#fg'))$('#fg').onclick=async()=>{const em=$('#ae').value.trim();if(!em)return aer('Escribí tu email arriba y volvé a tocar "Olvidé mi contraseña".');
+    const{error}=await sb.auth.resetPasswordForEmail(em,{redirectTo:location.origin});
+    aer(error?authErr(error):'Listo: si ese email tiene cuenta, te mandamos un enlace para elegir una nueva contraseña.',error?'bad':'ok')};
+  $('#af').onsubmit=async e=>{
+    e.preventDefault();const em=$('#ae').value.trim(),pw=$('#ap').value,nm=su?$('#an').value.trim():'';
+    if(su&&!nm)return aer('Escribí tu nombre.');
+    if(!/^\S+@\S+\.\S+$/.test(em))return aer('Escribí un email válido.');
+    if(pw.length<6)return aer('La contraseña debe tener al menos 6 caracteres.');
+    $('#ab').disabled=true;aer('');
+    if(su){
+      const{data,error}=await sb.auth.signUp({email:em,password:pw,options:{data:{full_name:nm}}});
+      if(error){$('#ab').disabled=false;return aer(authErr(error))}
+      if(data.user&&data.user.identities&&data.user.identities.length===0){$('#ab').disabled=false;return aer('Ese email ya tiene una cuenta. Tocá "Iniciar sesión".')}
+      if(!data.session){$('#ab').disabled=false;return aer('Te mandamos un mail para confirmar tu cuenta. Confirmalo y después ingresá.','ok')}
+    }else{
+      const{error}=await sb.auth.signInWithPassword({email:em,password:pw});
+      if(error){$('#ab').disabled=false;return aer(authErr(error))}
+    }}}
+function recoverView(){
+  view='recover';main.onclick=null;
+  main.innerHTML=`<div class="box"><b>Elegí una nueva contraseña</b><form id="rf2" novalidate><label>Nueva contraseña</label><input id="np" type="password" autocomplete="new-password" placeholder="Mínimo 6 caracteres"><button type="submit">Guardar</button><p id="rer"></p></form></div>`;
+  $('#rf2').onsubmit=async e=>{e.preventDefault();const p=$('#np').value;
+    if(p.length<6){$('#rer').className='bad';return $('#rer').textContent='La contraseña debe tener al menos 6 caracteres.'}
+    const{error}=await sb.auth.updateUser({password:p});
+    if(error){$('#rer').className='bad';return $('#rer').textContent=authErr(error)}
+    main.innerHTML='<div class="box ok">Contraseña actualizada ✔</div>';setTimeout(()=>go('home'),1500)}}
+
+/* ---------- inicio ---------- */
 async function home(){
-  const{data=[]}=await sb.from('public_list').select('*').order('display_name');
-  main.innerHTML=`<div class="grp">▾ Conectados ( ${data.length} )</div>`+(data.map(r=>`<div class="ct"><i class="dot"></i><b>${esc(r.display_name)}</b> - ♪ ${yt(r.song_url)?`<a href="${esc(r.song_url)}" target="_blank" rel="noopener">${esc(r.song_title)}</a>`:esc(r.song_title)}</div>`).join('')||'<p class="ct">Todavía no hay nadie. ¡Sé el primero en anotarte!</p>')}
-async function form(){
-  if(!user)return login();
+  await loadEvents();const ups=upcoming();
+  if(!ups.length){main.innerHTML='<div class="box">🎉 Estamos preparando la próxima fecha. ¡Volvé pronto!</div>';return}
+  const ls=await Promise.all(ups.map(e=>sb.rpc('public_event_list',{p_event_id:e.id})));
+  main.innerHTML=ups.map((e,i)=>{const data=ls[i].data||[];return evCard(e)+`<div class="grp">▾ Conectados ( ${data.length} )</div>`+
+    (data.map(r=>`<div class="ct"><i class="dot"></i><b>${esc(r.display_name)}</b> - ♪ ${yt(r.song_url)?`<a href="${esc(r.song_url)}" target="_blank" rel="noopener">${esc(r.song_title)}</a>`:esc(r.song_title)}</div>`).join('')||'<p class="ct">Todavía no hay nadie. ¡Sé el primero en anotarte!</p>')}).join('');
+  main.onclick=e=>{const b=e.target.closest('[data-ev]');if(b)want(b.dataset.ev)}}
+
+/* ---------- pedir entrada ---------- */
+async function want(id){
+  await loadEvents();const open=upcoming().filter(e=>!e.sold_out);
+  const e=id?open.find(x=>x.id==id):(open.length==1?open[0]:null);
+  if(!e)return go('home');
+  selEv=e.id;
+  if(!user)return authView('signup','Registrate para que te quede guardado el QR de tu entrada. Si no te registrás, no podemos guardártelo.','form');
+  view='form';main.onclick=null;renderForm(e)}
+async function renderForm(ev){
   const{data:p}=await sb.from('profiles').select('display_name').eq('id',user.id).maybeSingle();
-  main.innerHTML=`<div class="box"><h3>Solicitar entradas</h3><label>Tu nombre en la lista</label><input id="dn" maxlength="30" value="${esc(p?.display_name||user.user_metadata?.full_name||'')}">
-  <label>Cantidad de entradas</label><select id="qt">${[1,2,3,4,5,6,7,8,9,10].map(n=>`<option>${n}</option>`).join('')}</select><div id="nm"></div>
+  const max=Math.min(10,ev.remaining_low||10);
+  main.innerHTML=`<div class="box"><h3>Quiero una entrada</h3><p class="evl">🎉 <b>${esc(ev.name)}</b><br>📅 ${esc(fdate(ev.d))} · 🕘 ${ftime(ev.d)}</p>${ev.remaining_low?`<p class="low">🔥 ${lowTxt(ev.remaining_low)}</p>`:''}
+  <label>Tu nombre en la lista</label><input id="dn" maxlength="30" value="${esc(p?.display_name||user.user_metadata?.full_name||'')}">
+  <label>Cantidad de entradas</label><select id="qt">${Array.from({length:max},(_,i)=>`<option>${i+1}</option>`).join('')}</select><div id="nm"></div>
   <label>🎵 Canción que no puede faltar</label><input id="su" placeholder="Pegá el enlace de YouTube"><div id="sp" class="sp"></div><input id="st" placeholder="Nombre de la canción" maxlength="150" hidden>
   <button id="go">Enviar solicitud</button><p id="er"></p></div>`;
   const names=()=>{const old=[...document.querySelectorAll('.nm')].map(i=>i.value);$('#nm').innerHTML=Array.from({length:+$('#qt').value},(_,i)=>`<input class="nm" placeholder="Nombre y apellido de la entrada ${i+1}" maxlength="40" value="${esc(old[i]||'')}">`).join('')};
@@ -52,20 +137,26 @@ async function form(){
     if(!st){er('Buscando el título de la canción…');st=await getTitle(su);er('')}
     if(!st){$('#st').hidden=false;$('#go').disabled=false;return er('No pudimos leer el título. Escribilo en el cuadro de abajo.')}
     let r=await sb.from('profiles').upsert({id:user.id,display_name:dn});if(r.error){$('#go').disabled=false;return er('No se pudo guardar tu nombre.')}
-    r=await sb.from('requests').insert({user_id:user.id,quantity:q,song_title:st,song_url:su}).select().single();if(r.error){$('#go').disabled=false;return er('No se pudo enviar la solicitud.')}
+    r=await sb.from('requests').insert({user_id:user.id,event_id:ev.id,quantity:q,song_title:st,song_url:su}).select().single();if(r.error){console.error(r.error);$('#go').disabled=false;return er('No se pudo enviar la solicitud.')}
     const t=await sb.from('tickets').insert(ns.map(n=>({request_id:r.data.id,user_id:user.id,holder_name:n})));if(t.error){$('#go').disabled=false;return er('No se pudieron guardar los nombres.')}
-    const w=`https://wa.me/${C.WHATSAPP}?text=`+encodeURIComponent(`Hola! Quiero ${q} entrada${q>1?'s':''} para La Previa a nombre de:\n`+ns.map(n=>'- '+n).join('\n'));
-    main.innerHTML=`<div class="box"><h3>¡Solicitud enviada!</h3><p>Abrimos WhatsApp para avisar. Cuando la aprueben, vas a ver tus QR en "Mis entradas".</p><a class="bt" href="${w}">Abrir WhatsApp</a></div>`;setTimeout(()=>location.href=w,1500)}}
+    const w=`https://wa.me/${C.WHATSAPP}?text=`+encodeURIComponent(`Hola! Quiero ${q} entrada${q>1?'s':''} para ${ev.name} del ${fshort(ev.d)} a nombre de:\n`+ns.map(n=>'- '+n).join('\n'));
+    main.innerHTML=`<div class="box"><h3>¡Solicitud enviada!</h3><p>Abrimos WhatsApp para avisar. Cuando la aprueben, vas a ver tus QR en "Mis entradas" (quedan guardados en tu cuenta).</p><a class="bt" href="${w}">Abrir WhatsApp</a></div>`;setTimeout(()=>location.href=w,1500)}}
+
+/* ---------- mis entradas (historial por evento) ---------- */
 async function mine(){
-  if(!user)return login();
-  const{data}=await sb.from('requests').select('*,tickets(*)').eq('user_id',user.id).order('created_at',{ascending:false});
-  const rows=data||[],L={pending:'⏳ Solicitada',approved:'✅ Aprobada',rejected:'❌ Rechazada'};
+  if(!user)return authView('login','Ingresá para ver tus entradas guardadas.','mine');
+  const[rq]=await Promise.all([sb.from('requests').select('*,tickets(*)').eq('user_id',user.id).order('created_at',{ascending:false}),loadEvents()]);
+  const rows=rq.data||[],L={pending:'⏳ Solicitada',approved:'✅ Aprobada',rejected:'❌ Rechazada'};
+  const groups=[];rows.forEach(r=>{const k=r.event_id||'none';let g=groups.find(x=>x.k==k);if(!g){g={k,e:EV.find(e=>e.id==r.event_id),rs:[]};groups.push(g)}g.rs.push(r)});
+  groups.sort((a,b)=>(b.e?b.e.d:0)-(a.e?a.e.d:0));
   const tk=(r,t)=>r.status!='approved'?`<div class="ct">• ${esc(t.holder_name)}</div>`
     :!t.qr_code?`<div class="ct">• ${esc(t.holder_name)} <small class="bad">(QR no disponible, avisá al organizador)</small></div>`
     :`<div class="qr"><img data-q="${esc(t.qr_code)}" alt="QR"><div><b>${esc(t.holder_name)}</b><br>${t.checked_in?'Ya ingresó':''}<br><button data-s="${esc(t.qr_code)}" data-n="${esc(t.holder_name)}">Compartir</button></div></div>`;
-  main.innerHTML=`<div class="grp">Mis entradas <button id="rf">↻ Actualizar</button></div>`+(rows.map(r=>`<div class="box"><b>${L[r.status]||esc(r.status)}</b> · ${r.quantity} entrada(s)${(r.tickets||[]).map(t=>tk(r,t)).join('')}
+  const box=r=>`<div class="box"><b>${L[r.status]||esc(r.status)}</b> · ${r.quantity} entrada(s)${(r.tickets||[]).map(t=>tk(r,t)).join('')}
     <div class="sg"><label>🎵 Tu canción</label><div>${yt(r.song_url)?`<a href="${esc(r.song_url)}" target="_blank" rel="noopener">${esc(r.song_title)}</a>`:esc(r.song_title)}</div>
-    <input data-su="${r.id}" value="${esc(r.song_url)}" placeholder="Nuevo enlace de YouTube"><button data-sv="${r.id}">Cambiar canción</button><p class="sm" data-sm="${r.id}"></p></div></div>`).join('')||'<p class="ct">Todavía no pediste entradas.</p>');
+    <input data-su="${r.id}" value="${esc(r.song_url)}" placeholder="Nuevo enlace de YouTube"><button data-sv="${r.id}">Cambiar canción</button><p class="sm" data-sm="${r.id}"></p></div></div>`;
+  const title=g=>g.e?`🎟️ Entradas para ${esc(g.e.name)} del ${fshort(g.e.d)} · ${ftime(g.e.d)}${g.e.d.getTime()<Date.now()-12*36e5?' <small>(finalizado)</small>':''}`:'🎟️ Entradas anteriores';
+  main.innerHTML=`<div class="grp">Mis entradas <button id="rf">↻ Actualizar</button></div>`+(groups.map(g=>`<div class="grp ev-t">${title(g)}</div>`+g.rs.map(box).join('')).join('')||'<p class="ct">Todavía no pediste entradas.</p>');
   document.querySelectorAll('[data-q]').forEach(async i=>{
     try{
       if(typeof QRCode==='undefined'||typeof QRCode.toDataURL!=='function')throw new Error('la librería de QR no cargó (typeof QRCode = '+typeof QRCode+')');
@@ -91,20 +182,41 @@ function share(code,name){
   else alt()}
 async function admin(){
   if(!isAdmin())return home();
-  const{data=[]}=await sb.from('requests').select('*,profiles(display_name),tickets(*)').order('created_at',{ascending:false});
-  const pe=data.filter(r=>r.status=='pending'),ap=data.filter(r=>r.status=='approved'),tk=ap.flatMap(r=>r.tickets),ing=tk.filter(t=>t.checked_in).length;
-  main.innerHTML=`<div class="box"><button id="sc">📷 Escanear entrada</button><div id="rd"></div><div id="res"></div></div><div class="grp">Pendientes ( ${pe.length} )</div>`+
-  pe.map(r=>`<div class="box"><b>${esc(r.profiles?.display_name)}</b> · ${r.quantity} entrada(s)<br>${r.tickets.map(t=>esc(t.holder_name)).join(', ')}<br>♪ ${esc(r.song_title)}<br><button data-id="${r.id}" data-st="approved">Aprobar</button> <button data-id="${r.id}" data-st="rejected">Rechazar</button></div>`).join('')+
-  `<div class="grp">Entradas vendidas ( ${ing} / ${tk.length} ingresaron )</div>`+ap.map(r=>r.tickets.map(t=>`<div class="ct"><input type="checkbox" disabled ${t.checked_in?'checked':''}> ${esc(t.holder_name)} <small>(${esc(r.profiles?.display_name)})</small></div>`).join('')).join('');
-  main.onclick=async e=>{const b=e.target.closest('[data-id]');if(b){await sb.from('requests').update({status:b.dataset.st}).eq('id',b.dataset.id);admin();badge()}};
+  const[rq,ev]=await Promise.all([sb.from('requests').select('*,profiles(display_name),tickets(*)').order('created_at',{ascending:false}),sb.from('events').select('*').order('event_at')]);
+  const data=rq.data||[];AEV=(ev.data||[]).map(e=>({...e,d:new Date(e.event_at)}));
+  const evName=id=>{const e=AEV.find(x=>x.id==id);return e?`${esc(e.name)} del ${fshort(e.d)}`:'Sin evento'};
+  const sum=(id,st)=>data.filter(r=>(r.event_id||null)==id&&r.status==st).reduce((a,r)=>a+r.quantity,0);
+  const stat=e=>{const s=sum(e.id,'approved'),p=sum(e.id,'pending');return `<div class="ct"><span><b>${esc(e.name)}</b> · ${fshort(e.d)} ${ftime(e.d)}<br>Vendidas ${s} de ${e.capacity} · Quedan ${Math.max(e.capacity-s,0)} · Pendientes ${p}</span></div>`};
+  const pe=data.filter(r=>r.status=='pending');
+  const sold=[...AEV,{id:null,name:'Sin evento'}].map(e=>{const ap=data.filter(r=>r.status=='approved'&&(r.event_id||null)==(e.id||null));if(!ap.length)return'';
+    const tk=ap.flatMap(r=>r.tickets),ing=tk.filter(t=>t.checked_in).length;
+    return `<div class="grp">${esc(e.name)}${e.d?' '+fshort(e.d):''} — vendidas ( ${ing} / ${tk.length} ingresaron )</div>`+ap.map(r=>r.tickets.map(t=>`<div class="ct"><input type="checkbox" disabled ${t.checked_in?'checked':''}> ${esc(t.holder_name)} <small>(${esc(r.profiles?.display_name)})</small></div>`).join('')).join('')}).join('');
+  main.innerHTML=`<div class="box"><button id="sc">📷 Escanear entrada</button><div id="rd"></div><div id="res"></div></div>
+  <div class="box"><b>➕ Crear evento</b><label>Nombre</label><input id="en" value="La Previa" maxlength="60"><label>Fecha y hora</label><input id="ed" type="datetime-local"><label>Cantidad de entradas a la venta</label><input id="ec" type="number" min="1" inputmode="numeric" placeholder="Ej: 150"><button id="ecb">Crear evento</button><p id="eer"></p></div>
+  <div class="grp">Eventos</div>${ev.error?`<p class="bad ct">Falta ejecutar eventos.sql en Supabase (${esc(ev.error.message)})</p>`:AEV.map(stat).join('')||'<p class="ct">Todavía no creaste ningún evento.</p>'}
+  <div class="grp">Pendientes ( ${pe.length} )</div>`+
+  pe.map(r=>`<div class="box"><b>${esc(r.profiles?.display_name)}</b> · ${r.quantity} entrada(s) · <small>${evName(r.event_id)}</small><br>${r.tickets.map(t=>esc(t.holder_name)).join(', ')}<br>♪ ${esc(r.song_title)}<br><button data-id="${r.id}" data-st="approved">Aprobar</button> <button data-id="${r.id}" data-st="rejected">Rechazar</button></div>`).join('')+sold;
+  main.onclick=async e=>{const b=e.target.closest('[data-id]');if(!b)return;b.disabled=true;
+    const r=b.dataset.st=='approved'?await sb.rpc('approve_request',{p_request_id:String(b.dataset.id)}):await sb.from('requests').update({status:b.dataset.st}).eq('id',b.dataset.id);
+    if(r.error){console.error(r.error);alert(/sold_out/.test(r.error.message)?'No quedan entradas suficientes en ese evento para aprobar esta solicitud.':'No se pudo actualizar. Probá de nuevo.')}
+    admin();badge()};
+  $('#ecb').onclick=async()=>{
+    const n=$('#en').value.trim(),d=$('#ed').value,c=parseInt($('#ec').value,10),er=m=>$('#eer').textContent=m;
+    if(!n||!d||!(c>0))return er('Completá nombre, fecha y hora, y una cantidad mayor a 0.');
+    $('#ecb').disabled=true;
+    const{error}=await sb.from('events').insert({name:n,event_at:new Date(d).toISOString(),capacity:c});
+    if(error){console.error(error);$('#ecb').disabled=false;return er('No se pudo crear el evento ('+error.message+')')}
+    admin()};
   $('#sc').onclick=scan}
+const otherEv=t=>{const e=AEV.find(x=>x.id==t.requests?.event_id);return e&&Math.abs(Date.now()-e.d.getTime())>24*36e5?e:null};
 function scan(){
   const res=$('#res');res.textContent='';
   if(typeof Html5Qrcode==='undefined')return res.innerHTML='<p class="bad">La librería del escáner no cargó. Revisá tu conexión y recargá la página.</p>';
   const h=new Html5Qrcode('rd');
   h.start({facingMode:'environment'},{fps:10,qrbox:220},async txt=>{
-    await h.stop();const{data:t,error}=await sb.from('tickets').select('*,requests(status)').eq('qr_code',txt).maybeSingle();
+    await h.stop();const{data:t,error}=await sb.from('tickets').select('*,requests(status,event_id)').eq('qr_code',txt).maybeSingle();
     if(error||!t||t.requests?.status!='approved')res.innerHTML='<p class="bad">❌ QR inválido</p>';
+    else if(otherEv(t))res.innerHTML=`<p class="bad">⚠️ Entrada de otro evento: ${esc(otherEv(t).name)} (${fshort(otherEv(t).d)})</p>`;
     else if(t.checked_in)res.innerHTML=`<p class="bad">⚠️ ${esc(t.holder_name)} ya ingresó</p>`;
     else{await sb.from('tickets').update({checked_in:true,checked_in_at:new Date().toISOString()}).eq('id',t.id);res.innerHTML=`<p class="ok">✔ Entrada válida: ${esc(t.holder_name)}</p>`}
     res.innerHTML+='<button id="again">Escanear otra</button>';$('#again').onclick=()=>admin().then(scan)},()=>{}).catch(()=>res.innerHTML='<p class="bad">No se pudo abrir la cámara. Dale permiso al navegador.</p>')}
@@ -114,4 +226,11 @@ async function badge(){
   if(last!==null&&count>last)alert('🔔 Nueva solicitud de entradas');last=count}
 setInterval(badge,30000);
 const vid=(C.MUSIC_URL.match(/(?:v=|youtu\.be\/)([\w-]{11})/)||[])[1];
-if(vid){let on=0;$('#music').innerHTML='<button id="mu">♫ Activar música</button>';$('#mu').onclick=e=>{on=!on;$('#mp').innerHTML=on?`<iframe width="1" height="1" allow="autoplay" src="https://www.youtube.com/embed/${vid}?autoplay=1&loop=1&playlist=${vid}"></iframe>`:'';e.target.textContent=on?'⏸ Pausar música':'♫ Activar música'}}
+if(vid){
+  let on=0,armed=1;
+  const set=v=>{on=v;$('#mp').innerHTML=on?`<iframe width="1" height="1" allow="autoplay" src="https://www.youtube.com/embed/${vid}?autoplay=1&loop=1&playlist=${vid}"></iframe>`:'';$('#mu').textContent=on?'⏸ Pausar música':'♫ Activar música'};
+  $('#music').innerHTML='<button id="mu">♫ Activar música</button>';
+  $('#mu').onclick=()=>{armed=0;set(!on)};
+  /* Los navegadores no permiten sonido sin que la persona toque algo: arranca con el primer toque en cualquier lado */
+  const kick=e=>{if(!armed)return;armed=0;if(e.target.closest&&e.target.closest('#music'))return;set(1)};
+  document.addEventListener('pointerdown',kick);document.addEventListener('keydown',kick)}

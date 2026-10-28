@@ -26,3 +26,8 @@ main{flex:1;border-top:1px solid #c5d5e8;padding:6px 0}
 .ok{color:#1d7a1d;font-weight:700}.bad{color:#b3261e;font-weight:700}#bd{color:#c4442a}
 #ad{padding:10px;text-align:center;font-size:11px;color:#5b7391;border-top:1px solid #c5d5e8;background:#eef4fb}
 .sp{color:#5b7391;margin:2px 0 6px;min-height:1em}.sg{margin-top:8px;border-top:1px dashed #c5d5e8;padding-top:2px}.sm{margin:4px 0 0}.grp #rf{margin-left:8px;font-weight:400;padding:2px 8px}
+#cta:disabled{filter:grayscale(1);cursor:default;animation:none}
+#me .bt{padding:3px 10px}.tabs{display:flex;gap:4px;margin-bottom:6px}.tabs a{flex:1;text-align:center;padding:6px;border:1px solid #9ab3cf;border-radius:4px;background:#eef4fb;cursor:pointer}.tabs a.on{background:#fff;font-weight:700;border-bottom-color:#fff}
+.note{margin:0 0 8px;padding:8px;border:1px solid #f0c36d;background:#fff8e1;border-radius:4px}.lk{color:#0a58b8;cursor:pointer;text-decoration:underline}.box hr{border:0;border-top:1px dashed #c5d5e8;margin:10px 0}
+.ev .big{font-size:20px;letter-spacing:1px;margin:6px 0}.low{color:#c4442a;font-weight:700;margin:6px 0}.ev button{margin-top:6px}.evl{margin:4px 0}.ev-t{background:#e6f1fc;margin-top:6px}
+#aer.ok,#rer.ok{color:#1d7a1d}
