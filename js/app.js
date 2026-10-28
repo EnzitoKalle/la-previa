@@ -32,22 +32,29 @@ sb.auth.onAuthStateChange((ev,s)=>{
     if(view==='auth'||view==='recover'){view=afterV||'home';afterV=null}}
   head();setTimeout(()=>go(view),0)});
 function head(){
-  $('#mb').innerHTML=[['home','Archivo'],['list','Contactos'],['form','Quiero una entrada'],['mine','Mis entradas']].concat(isAdmin()?[['admin','Admin<span id="bd"></span>']]:[]).map(([v,t])=>`<a data-v="${v}">${t}</a>`).join('');
+  $('#mb').innerHTML=[['home','Inicio'],['contact','Contactos'],['form','Quiero una entrada'],['mine','Mis entradas']].concat(isAdmin()?[['admin','Admin<span id="bd"></span>']]:[]).map(([v,t])=>`<a data-v="${v}">${t}</a>`).join('');
   $('#mb').onclick=e=>{const v=e.target.closest('a')?.dataset.v;if(v)go(v)};
   $('#me').innerHTML=user?`${esc(user.user_metadata?.full_name||user.email)} · <a id="out">Salir</a>`:'<button class="bt" id="in">Iniciar sesión</button> <button class="bt" id="up">Registrarse</button>';
   if($('#out'))$('#out').onclick=()=>sb.auth.signOut();
   if($('#in'))$('#in').onclick=()=>authView('login');if($('#up'))$('#up').onclick=()=>authView('signup');mark();badge()}
-$('#cta').onclick=()=>want(null);
-function go(v){view=v;mark();main.onclick=null;({home:home,list:home,form:()=>want(selEv),mine:mine,admin:admin,auth:()=>authView('login'),recover:recoverView}[v]||home)()}
+$('#evbox').onclick=e=>{const b=e.target.closest('#cta');if(b&&!b.disabled)want(b.dataset.ev)};
+function go(v){view=v;mark();main.onclick=null;({home:home,list:home,form:()=>want(selEv),mine:mine,admin:admin,auth:()=>authView('login'),recover:recoverView,contact:contactView}[v]||home)()}
 
 /* ---------- eventos ---------- */
 async function loadEvents(){
   const{data,error}=await sb.rpc('get_events');if(error)console.error('eventos',error);
   EV=(data||[]).map(e=>({...e,d:new Date(e.event_at)}));updateCta();return EV}
 const upcoming=()=>EV.filter(e=>e.d.getTime()>Date.now()-12*36e5);
-function updateCta(){const u=upcoming(),b=$('#cta'),all=u.length>0&&u.every(e=>e.sold_out);b.textContent=all?'ENTRADAS AGOTADAS':'QUIERO UNA ENTRADA';b.disabled=all}
+const feat=()=>{const u=upcoming();return u.find(e=>!e.sold_out)||u[0]||null};
+const mapLink=a=>'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(a);
+const evInfo=e=>`<span>📅 ${esc(fdate(e.d))}</span><span>🕘 ${ftime(e.d)}</span>${e.address?`<span>📍 <a href="${mapLink(e.address)}" target="_blank" rel="noopener">${esc(e.address)}</a></span>`:''}`;
+function updateCta(){
+  const e=feat(),b=$('#evbox');
+  if(!e){b.innerHTML='<div class="evtop"><div class="evn2">🎉 Estamos preparando la próxima fecha</div><div class="evd"><span>¡Volvé pronto!</span></div></div>';return}
+  b.innerHTML=`<div class="evtop"><div class="evn2">🎉 ${esc(e.name)}</div><div class="evd">${evInfo(e)}</div>`+
+    (e.sold_out?'<div class="pill red">AGOTADAS</div>':(e.remaining_low?`<div class="pill hot">🔥 ${lowTxt(e.remaining_low)}</div>`:'')+`<button id="cta" data-ev="${e.id}">QUIERO UNA ENTRADA</button>`)+`</div>`}
 const lowTxt=n=>n==1?'¡Última entrada disponible!':`¡Últimas ${n} entradas disponibles!`;
-const evCard=e=>`<div class="box ev"><div class="evn">🎉 ${esc(e.name)}</div><div class="evd"><span>📅 ${esc(fdate(e.d))}</span><span>🕘 ${ftime(e.d)}</span></div>`+
+const evCard=e=>`<div class="box ev"><div class="evn">🎉 ${esc(e.name)}</div><div class="evd">${evInfo(e)}</div>`+
   (e.sold_out?'<div class="pill red">AGOTADAS</div>':(e.remaining_low?`<div class="pill hot">🔥 ${lowTxt(e.remaining_low)}</div><br>`:'')+`<button data-ev="${e.id}">Quiero una entrada</button>`)+`</div>`;
 
 /* ---------- registro / ingreso ---------- */
@@ -93,12 +100,18 @@ function recoverView(){
 
 /* ---------- inicio ---------- */
 async function home(){
-  await loadEvents();const ups=upcoming();
-  if(!ups.length){main.innerHTML='<div class="box">🎉 Estamos preparando la próxima fecha. ¡Volvé pronto!</div>';return}
-  const ls=await Promise.all(ups.map(e=>sb.rpc('public_event_list',{p_event_id:e.id})));
-  main.innerHTML=ups.map((e,i)=>{const data=ls[i].data||[];return evCard(e)+`<div class="grp">▾ Conectados ( ${data.length} )</div>`+
+  await loadEvents();const ups=upcoming(),f=feat();
+  if(!ups.length){main.innerHTML='';return}
+  const order=[f,...ups.filter(e=>e!==f)];
+  const ls=await Promise.all(order.map(e=>sb.rpc('public_event_list',{p_event_id:e.id})));
+  main.innerHTML=order.map((e,i)=>{const data=ls[i].data||[];return (i?evCard(e):'')+`<div class="grp">▾ Conectados ( ${data.length} )${order.length>1?` · ${esc(e.name)}`:''}</div>`+
     (data.map(r=>`<div class="ct"><i class="dot"></i><b>${esc(r.display_name)}</b> - ♪ ${yt(r.song_url)?`<a href="${esc(r.song_url)}" target="_blank" rel="noopener">${esc(r.song_title)}</a>`:esc(r.song_title)}</div>`).join('')||'<p class="ct">Todavía no hay nadie. ¡Sé el primero en anotarte!</p>')}).join('');
   main.onclick=e=>{const b=e.target.closest('[data-ev]');if(b)want(b.dataset.ev)}}
+
+/* ---------- contacto ---------- */
+function contactView(){
+  const ig=(C.INSTAGRAM||'').trim(),igUrl=ig?(/^https?:/i.test(ig)?ig:'https://instagram.com/'+ig.replace(/^@/,'')):'';
+  main.innerHTML=`<div class="box"><h3>Contacto</h3><p class="evl">📱 <b>${esc(C.PHONE||'')}</b></p><p><a class="bt" href="https://wa.me/${esc(C.WHATSAPP)}" target="_blank" rel="noopener">💬 WhatsApp</a> <a class="bt" href="tel:${esc(C.PHONE||'')}">📞 Llamar</a>${igUrl?` <a class="bt" href="${esc(igUrl)}" target="_blank" rel="noopener">📸 Instagram</a>`:''}</p></div>`}
 
 /* ---------- pedir entrada ---------- */
 async function want(id){
@@ -110,8 +123,8 @@ async function want(id){
   view='form';mark();main.onclick=null;renderForm(e)}
 async function renderForm(ev){
   const{data:p}=await sb.from('profiles').select('display_name').eq('id',user.id).maybeSingle();
-  const max=Math.min(10,ev.remaining_low||10);
-  main.innerHTML=`<div class="box"><h3>Quiero una entrada</h3><p class="evl">🎉 <b>${esc(ev.name)}</b><br>📅 ${esc(fdate(ev.d))} · 🕘 ${ftime(ev.d)}</p>${ev.remaining_low?`<p class="low">🔥 ${lowTxt(ev.remaining_low)}</p>`:''}
+  const max=Math.min(10,ev.remaining_low||10),showEv=!feat()||feat().id!==ev.id;
+  main.innerHTML=`<div class="box"><h3>Quiero una entrada</h3>${showEv?`<p class="evl">🎉 <b>${esc(ev.name)}</b><br>${evInfo(ev).replace(/<\/span><span>/g,' · ').replace(/<\/?span>/g,'')}</p>${ev.remaining_low?`<p class="low">🔥 ${lowTxt(ev.remaining_low)}</p>`:''}`:''}
   <label>Tu nombre en la lista</label><input id="dn" maxlength="30" value="${esc(p?.display_name||user.user_metadata?.full_name||'')}">
   <label>Cantidad de entradas</label><select id="qt">${Array.from({length:max},(_,i)=>`<option>${i+1}</option>`).join('')}</select><div id="nm"></div>
   <label>🎵 Canción que no puede faltar</label><input id="su" placeholder="Pegá el enlace de YouTube"><div id="sp" class="sp"></div><input id="st" placeholder="Nombre de la canción" maxlength="150" hidden>
@@ -189,14 +202,14 @@ async function admin(){
   const data=rq.data||[];AEV=(ev.data||[]).map(e=>({...e,d:new Date(e.event_at)}));
   const evName=id=>{const e=AEV.find(x=>x.id==id);return e?`${esc(e.name)} del ${fshort(e.d)}`:'Sin evento'};
   const sum=(id,st)=>data.filter(r=>(r.event_id||null)==id&&r.status==st).reduce((a,r)=>a+r.quantity,0);
-  const stat=e=>{const s=sum(e.id,'approved'),p=sum(e.id,'pending');return `<div class="ct"><span><b>${esc(e.name)}</b> · ${fshort(e.d)} ${ftime(e.d)}<br>Vendidas ${s} de ${e.capacity} · Quedan ${Math.max(e.capacity-s,0)} · Pendientes ${p}</span><button class="ed" data-ed="${e.id}">✏️ Editar</button></div>`};
+  const stat=e=>{const s=sum(e.id,'approved'),p=sum(e.id,'pending');return `<div class="ct"><span><b>${esc(e.name)}</b> · ${fshort(e.d)} ${ftime(e.d)}${e.address?` · ${esc(e.address)}`:''}<br>Vendidas ${s} de ${e.capacity} · Quedan ${Math.max(e.capacity-s,0)} · Pendientes ${p}</span><button class="ed" data-ed="${e.id}">✏️ Editar</button></div>`};
   const pe=data.filter(r=>r.status=='pending');
   const sold=[...AEV,{id:null,name:'Sin evento'}].map(e=>{const ap=data.filter(r=>r.status=='approved'&&(r.event_id||null)==(e.id||null));if(!ap.length)return'';
     const tk=ap.flatMap(r=>r.tickets),ing=tk.filter(t=>t.checked_in).length;
     return `<div class="grp">${esc(e.name)}${e.d?' '+fshort(e.d):''} — vendidas ( ${ing} / ${tk.length} ingresaron )</div>`+ap.map(r=>r.tickets.map(t=>`<div class="ct"><input type="checkbox" disabled ${t.checked_in?'checked':''}> ${esc(t.holder_name)} <small>(${esc(r.profiles?.display_name)})</small></div>`).join('')).join('')}).join('');
   const cur=AEV.find(e=>e.id==editId);if(!cur)editId=null;
   main.innerHTML=`<div class="box"><button id="sc">📷 Escanear entrada</button><div id="rd"></div><div id="res"></div></div>
-  <div class="box" id="evf"><b>${cur?'✏️ Editar evento':'➕ Crear evento'}</b><label>Nombre</label><input id="en" value="${esc(cur?cur.name:'La Previa')}" maxlength="60"><label>Fecha y hora</label><input id="ed" type="datetime-local" value="${cur?loc(cur.d):''}"><label>Cantidad de entradas a la venta</label><input id="ec" type="number" min="1" inputmode="numeric" placeholder="Ej: 150" value="${cur?cur.capacity:''}"><button id="ecb">${cur?'Guardar cambios':'Crear evento'}</button>${cur?' <button id="ecc">Cancelar</button>':''}<p id="eer" class="bad"></p></div>
+  <div class="box" id="evf"><b>${cur?'✏️ Editar evento':'➕ Crear evento'}</b><label>Nombre</label><input id="en" value="${esc(cur?cur.name:'La Previa')}" maxlength="60"><label>Fecha y hora</label><input id="ed" type="datetime-local" value="${cur?loc(cur.d):''}"><label>Dirección</label><input id="ea" maxlength="120" placeholder="Calle y número, ciudad" value="${esc(cur?cur.address||'':'')}"><label>Cantidad de entradas a la venta</label><input id="ec" type="number" min="1" inputmode="numeric" placeholder="Ej: 150" value="${cur?cur.capacity:''}"><button id="ecb">${cur?'Guardar cambios':'Crear evento'}</button>${cur?' <button id="ecc">Cancelar</button>':''}<p id="eer" class="bad"></p></div>
   <div class="grp">Eventos</div>${ev.error?`<p class="bad ct">Falta ejecutar eventos.sql en Supabase (${esc(ev.error.message)})</p>`:AEV.map(stat).join('')||'<p class="ct">Todavía no creaste ningún evento.</p>'}
   <div class="box"><b>🎶 Rocola</b><p class="sm">Pegá uno o varios enlaces de YouTube (uno por línea). En la página suena una canción al azar y pasa a la siguiente cuando termina.</p><textarea id="jl" rows="3" placeholder="https://www.youtube.com/watch?v=..."></textarea><button id="jla">Agregar a la rocola</button><p id="jer" class="bad"></p>${jk.error?`<p class="bad">Falta ejecutar rocola.sql en Supabase (${esc(jk.error.message)})</p>`:(jk.data||[]).map(x=>`<div class="ct"><span>♪ ${esc(x.title)}</span><button class="ed" data-jd="${x.id}">✕</button></div>`).join('')||'<p class="sm">Todavía no agregaste canciones.</p>'}</div>
   <div class="grp">Pendientes ( ${pe.length} )</div>`+
@@ -212,7 +225,7 @@ async function admin(){
     const n=$('#en').value.trim(),d=$('#ed').value,c=parseInt($('#ec').value,10),er=m=>$('#eer').textContent=m;
     if(!n||!d||!(c>0))return er('Completá nombre, fecha y hora, y una cantidad mayor a 0.');
     if(editId){const v=sum(editId,'approved');if(c<v)return er(`Ya aprobaste ${v} entradas: la cantidad no puede ser menor a eso.`)}
-    $('#ecb').disabled=true;const row={name:n,event_at:new Date(d).toISOString(),capacity:c};
+    $('#ecb').disabled=true;const row={name:n,event_at:new Date(d).toISOString(),capacity:c,address:$('#ea').value.trim()};
     const{error}=editId?await sb.from('events').update(row).eq('id',editId):await sb.from('events').insert(row);
     if(error){console.error(error);$('#ecb').disabled=false;return er('No se pudo guardar el evento ('+error.message+')')}
     editId=null;admin()};
