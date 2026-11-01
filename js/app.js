@@ -28,17 +28,12 @@ const ICO={
  shuffle:'<path d="M3 7h3.5c5 0 5 10 10 10H21M3 17h3.5c1.4 0 2.5-.6 3.4-1.6M14 8.4c.8-.9 1.8-1.4 3-1.4H21"/><path d="m18.5 4.5 2.5 2.5-2.5 2.5M18.5 14.5l2.5 2.5-2.5 2.5"/>',
  phone:'<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/>',
  ig:'<rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor"/>',
+ chev:'<path d="m9 6 6 6-6 6"/>',
  share:'<path d="M12 15V4M8 8l4-4 4 4"/><path d="M5 12v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/>'};
-const svg=(n,c='')=>`<svg class="ic ${c}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[n]||''}</svg>`;
+const svg=(n,c='')=>`<svg class="ic ${c}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[n]||''}</svg>`;
 const GLOGO='<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>';
-const avc=n=>{let h=0;for(const c of String(n))h=(h*31+c.charCodeAt(0))%360;return `background:linear-gradient(135deg,hsl(${h} 85% 62%),hsl(${(h+55)%360} 80% 50%))`};
+const avc=n=>{let h=0;for(const c of String(n))h=(h*31+c.charCodeAt(0))%360;return `background:hsl(${h} 32% 38%)`};
 const skel='<div class="sk h"></div><div class="sk"></div><div class="sk"></div>';
-function confetti(){
-  if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
-  const c=document.createElement('canvas');c.style.cssText='position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:200';document.body.appendChild(c);
-  const x=c.getContext('2d'),W=c.width=innerWidth,H=c.height=innerHeight,cols=['#ff4d8d','#8b5cf6','#22d3ee','#ffb020','#34d399','#ffffff'];
-  const P=Array.from({length:150},()=>({x:W/2+(Math.random()-.5)*90,y:H*.6,vx:(Math.random()-.5)*15,vy:-Math.random()*17-6,s:6+Math.random()*7,r:Math.random()*6,vr:(Math.random()-.5)*.4,c:cols[Math.random()*cols.length|0]}));
-  let t=0;(function f(){t++;x.clearRect(0,0,W,H);P.forEach(p=>{p.vy+=.45;p.x+=p.vx;p.y+=p.vy;p.vx*=.99;p.r+=p.vr;x.save();x.translate(p.x,p.y);x.rotate(p.r);x.fillStyle=p.c;x.fillRect(-p.s/2,-p.s/4,p.s,p.s/2);x.restore()});if(t<180)requestAnimationFrame(f);else c.remove()})()}
 let user=null,view='home',ready=0,last=null,selEv=null,afterV=null,EV=[],AEV=[];
 const isAdmin=()=>user&&user.email===C.ADMIN_EMAIL;
 const mark=()=>{const v=view==='list'?'home':view;document.body.dataset.view=v;document.querySelectorAll('#mb a').forEach(a=>a.classList.toggle('on',a.dataset.v===v))};
@@ -74,8 +69,10 @@ function head(){
   if($('#out'))$('#out').onclick=()=>sb.auth.signOut();
   if($('#in'))$('#in').onclick=()=>authView('login');if($('#up'))$('#up').onclick=()=>authView('signup');mark();badge()}
 $('#brand').onclick=e=>{e.preventDefault();go('home')};
-if(matchMedia('(hover:hover)').matches){let raf=0;$('#evbox').onpointermove=e=>{if(raf)return;const h=e.target.closest('.hero');if(!h)return;const x=e.clientX,y=e.clientY;raf=requestAnimationFrame(()=>{raf=0;const r=h.getBoundingClientRect();h.style.setProperty('--mx',(x-r.left)+'px');h.style.setProperty('--my',(y-r.top)+'px')})}}
-$('#evbox').onclick=e=>{const b=e.target.closest('#cta');if(b&&!b.disabled)want(b.dataset.ev)};
+
+$('#evbox').onclick=e=>{
+  if(e.target.closest('#strip')){const t=()=>{const x=$('#conectados');if(x)x.scrollIntoView({behavior:'smooth',block:'start'})};if(view==='home'||view==='list')t();else{go('home');setTimeout(t,700)}return}
+  const b=e.target.closest('#cta');if(b&&!b.disabled)want(b.dataset.ev)};
 function go(v){view=v;mark();main.onclick=null;({home:home,list:home,form:()=>want(selEv),mine:mine,admin:admin,auth:()=>authView('login'),recover:recoverView,contact:contactView}[v]||home)()}
 
 /* ---------- eventos ---------- */
@@ -98,26 +95,32 @@ const mapLink=a=>'https://www.google.com/maps/search/?api=1&query='+encodeURICom
 const evInfo=e=>`<span>${svg('cal')}${esc(fdate(e.d))}</span><span>${svg('clock')}${ftime(e.d)}</span>${e.address?`<span>${svg('pin')}<a href="${mapLink(e.address)}" target="_blank" rel="noopener">${esc(e.address)}</a></span>`:''}`;
 const lowTxt=n=>n==1?'¡Última entrada disponible!':`¡Últimas ${n} entradas disponibles!`;
 const evPill=e=>e.sold_out?'<div class="pill red">Agotadas</div>':(e.remaining_low?`<div class="pill hot"><i class="live"></i>${lowTxt(e.remaining_low)}</div>`:'');
-const monOf=d=>d.toLocaleDateString('es-AR',{month:'short'}).replace('.','').toUpperCase();
 let cdT=0;
 function tickCd(){
   const e=feat(),el=$('#cd');if(!e||!el)return;
   const s=Math.floor((e.d.getTime()-Date.now())/1000);
-  if(s<=0){if(!el.querySelector('.now'))el.innerHTML='<div class="now"><i class="live"></i>¡La fiesta ya empezó!</div>';return}
-  const v=[Math.floor(s/86400),Math.floor(s%86400/3600),Math.floor(s%3600/60),s%60];
-  el.querySelectorAll('b').forEach((x,i)=>{const t=String(v[i]).padStart(2,'0');if(x.textContent!==t)x.textContent=t})}
+  if(s<=0){el.textContent='¡La fiesta ya empezó!';return}
+  const d=Math.floor(s/86400),p=n=>String(n).padStart(2,'0');
+  el.textContent=`Faltan ${d?d+(d==1?' día · ':' días · '):''}${p(Math.floor(s%86400/3600))}:${p(Math.floor(s%3600/60))}:${p(s%60)}`}
+function strip(){
+  const e=feat(),el=$('#strip');if(!el||!e)return;
+  const c=LST[e.id];if(!c||c.p){el.hidden=true;return}
+  const v=c.v,n=v.length,nm=g=>esc((g.display_name||'').trim().split(' ')[0]);
+  const txt=n==0?'Todavía no hay nadie anotado. ¡Sé el primero!':n==1?`${nm(v[0])} ya se anotó`:n==2?`${nm(v[0])} y ${nm(v[1])} ya se anotaron`:`${nm(v[0])}, ${nm(v[1])} y ${n-2} más ya se anotaron`;
+  el.hidden=false;
+  el.innerHTML=(n?`<span class="stack">${v.slice(0,4).map(g=>`<i class="av" style="${avc(g.display_name)}">${esc((g.display_name||'?').trim().charAt(0).toUpperCase())}</i>`).join('')}</span>`:'')+`<span class="stxt">${txt}</span>${svg('chev')}`}
 function updateCta(){
   const e=feat(),b=$('#evbox');clearInterval(cdT);
-  const eyebrow=C.STATUS_MSG?`<div class="eyebrow"><i class="live"></i>${esc(C.STATUS_MSG)}</div>`:'';
-  if(!e){b.innerHTML=`<div class="hero evtop">${eyebrow}<h1 class="evn2">Estamos preparando la próxima fecha</h1><p class="sub">Volvé pronto: apenas se confirme, vas a poder pedir tu entrada desde acá.</p></div>`;return}
-  const wd=e.d.toLocaleDateString('es-AR',{weekday:'long'});
-  b.innerHTML=`<div class="hero evtop">${eyebrow}<h1 class="evn2">${esc(e.name)}</h1>
-   <div class="when"><div class="cal"><span>${monOf(e.d)}</span><b>${e.d.getDate()}</b></div><div class="wh"><span class="wd">${esc(wd)}</span><span class="hr">${svg('clock')}${ftime(e.d)}</span></div></div>
+  const tag=C.STATUS_MSG?`<p class="tag">${esc(C.STATUS_MSG)}</p>`:'';
+  if(!e){b.innerHTML=`<div class="hero">${tag}<h1 class="evn2">Estamos preparando la próxima fecha</h1><p class="sub">Volvé pronto: apenas se confirme, vas a poder pedir tu entrada desde acá.</p></div>`;return}
+  b.innerHTML=`<div class="hero">${tag}<h1 class="evn2">${esc(e.name)}</h1>
+   <p class="meta">${esc(fdate(e.d))} · ${ftime(e.d)}</p>
    ${e.address?`<a class="where" href="${mapLink(e.address)}" target="_blank" rel="noopener">${svg('pin')}<span>${esc(e.address)}</span></a>`:''}
-   <div class="cd" id="cd"><div><b>00</b><small>días</small></div><div><b>00</b><small>horas</small></div><div><b>00</b><small>min</small></div><div><b>00</b><small>seg</small></div></div>
-   ${evPill(e)}${e.sold_out?'':`<button id="cta" class="pri big" data-ev="${e.id}"><span>Quiero una entrada</span>${svg('ticket')}</button>`}</div>`;
-  cdT=setInterval(tickCd,1000);tickCd()}
-const evCard=e=>`<div class="box ev"><div class="evrow"><div class="cal mini"><span>${monOf(e.d)}</span><b>${e.d.getDate()}</b></div><div><div class="evn">${esc(e.name)}</div><div class="evd">${evInfo(e)}</div></div></div>${evPill(e)}${e.sold_out?'':`<button class="pri" data-ev="${e.id}">Quiero una entrada</button>`}</div>`;
+   <p class="cdl" id="cd"></p>
+   ${evPill(e)}${e.sold_out?'':`<button id="cta" class="pri big" data-ev="${e.id}"><span>Quiero una entrada</span></button>`}
+   <button class="strip" id="strip" hidden></button></div>`;
+  cdT=setInterval(tickCd,1000);tickCd();strip()}
+const evCard=e=>`<div class="box ev"><div class="evn">${esc(e.name)}</div><div class="evd">${evInfo(e)}</div>${evPill(e)}${e.sold_out?'':`<button class="pri" data-ev="${e.id}">Quiero una entrada</button>`}</div>`;
 
 /* ---------- registro / ingreso ---------- */
 function authView(mode='login',notice='',after=null){
@@ -163,7 +166,7 @@ function recoverView(){
 
 /* ---------- inicio ---------- */
 const guest=(r,i)=>{const t=r.song_title||'Canción de YouTube',sg=(r.song_url||r.song_title)?(yt(r.song_url)?`<a class="song" href="${esc(r.song_url)}" target="_blank" rel="noopener">${svg('note')}<span>${esc(t)}</span></a>`:`<span class="song">${svg('note')}<span>${esc(t)}</span></span>`):'';
-  return `<div class="guest" style="--i:${i}"><i class="av" style="${avc(r.display_name)}">${esc((r.display_name||'?').trim().charAt(0).toUpperCase())}</i><div class="gm"><b>${esc(r.display_name)}</b>${sg}</div></div>`};
+  return `<div class="guest${i>=6?' more':''}"><i class="av" style="${avc(r.display_name)}">${esc((r.display_name||'?').trim().charAt(0).toUpperCase())}</i><div class="gm"><b>${esc(r.display_name)}</b>${sg}</div></div>`};
 async function home(){
   main.innerHTML=skel;
   await loadEvents();const ups=upcoming(),f=feat();
@@ -171,9 +174,11 @@ async function home(){
   const order=[f,...ups.filter(e=>e!==f)];
   const ls=await Promise.all(order.map(e=>getList(e.id)));
   if(view!=='home'&&view!=='list')return;
-  main.innerHTML=order.map((e,i)=>{const data=ls[i]||[];return (i?evCard(e):'')+`<div class="sec"><h2>Conectados${order.length>1?` · ${esc(e.name)}`:''}</h2><span class="cnt">${data.length}</span></div>`+
-    (data.map((r,k)=>guest(r,k)).join('')||'<div class="empty">Todavía no hay nadie anotado.<b>¡Sé el primero!</b></div>')}).join('');
-  main.onclick=e=>{const b=e.target.closest('[data-ev]');if(b)want(b.dataset.ev)}}
+  strip();
+  main.innerHTML=order.map((e,i)=>{const data=ls[i]||[];return (i?evCard(e):'')+`<div class="sec"${i?'':' id="conectados"'}><h2>Conectados${order.length>1?` · ${esc(e.name)}`:''}</h2><span class="cnt">${data.length}</span></div>`+
+    (data.length?`<div class="guests" id="gl${i}">${data.map((r,k)=>guest(r,k)).join('')}</div>${data.length>6?`<button class="moreb" data-more="gl${i}">Ver los ${data.length} conectados</button>`:''}`:'<div class="empty">Todavía no hay nadie anotado.<b>¡Sé el primero!</b></div>')}).join('');
+  main.onclick=e=>{const m=e.target.closest('[data-more]');if(m){const g=$('#'+m.dataset.more);g.classList.toggle('open');m.textContent=g.classList.contains('open')?'Ver menos':`Ver los ${g.children.length} conectados`;return}
+    const b=e.target.closest('[data-ev]');if(b)want(b.dataset.ev)}}
 
 /* ---------- contacto ---------- */
 function contactView(){
@@ -230,7 +235,7 @@ async function renderForm(ev){
     if(r.error){console.error(r.error);$('#go').disabled=false;return er('No se pudo enviar la solicitud.')}
     const t=await sb.from('tickets').insert(ns.map(n=>({request_id:r.data.id,user_id:user.id,holder_name:n})));if(t.error){$('#go').disabled=false;return er('No se pudieron guardar los nombres.')}
     const w=`https://wa.me/${C.WHATSAPP}?text=`+encodeURIComponent(`Hola! Quiero ${q} entrada${q>1?'s':''} para ${ev.name} del ${fshort(ev.d)} a nombre de:\n`+ns.map(n=>'- '+n).join('\n'));
-    bust();main.innerHTML=`<div class="box"><h3>¡Solicitud enviada! 🎉</h3><p class="hello">Abrimos WhatsApp para avisar. Cuando la aprueben, vas a ver tus QR en "Mis entradas": quedan guardados en tu cuenta.</p><a class="bt pri big" href="${w}">Abrir WhatsApp</a></div>`;confetti();setTimeout(()=>location.href=w,2600)}}
+    bust();main.innerHTML=`<div class="box"><h3>¡Solicitud enviada!</h3><p class="hello">Abrimos WhatsApp para avisar. Cuando la aprueben, vas a ver tus QR en "Mis entradas": quedan guardados en tu cuenta.</p><a class="bt pri big" href="${w}">Abrir WhatsApp</a></div>`;setTimeout(()=>location.href=w,1800)}}
 
 /* ---------- mis entradas (historial por evento) ---------- */
 async function mine(){
@@ -287,12 +292,9 @@ async function admin(){
     const tk=ap.flatMap(r=>r.tickets),ing=tk.filter(t=>t.checked_in).length;
     return `<div class="grp">${esc(e.name)}${e.d?' '+fshort(e.d):''} — vendidas ( ${ing} / ${tk.length} ingresaron )</div>`+ap.map(r=>r.tickets.map(t=>`<div class="ct"><input type="checkbox" disabled ${t.checked_in?'checked':''}> ${esc(t.holder_name)} <small>(${esc(r.profiles?.display_name)})</small></div>`).join('')).join('')}).join('');
   const cur=AEV.find(e=>e.id==editId);if(!cur)editId=null;
-  main.innerHTML=`<div class="box"><button id="sc" class="pri">📷 Escanear entrada</button><div id="rd"></div><div id="res"></div></div>
-  <div class="box" id="evf"><b>${cur?'✏️ Editar evento':'➕ Crear evento'}</b><label>Nombre</label><input id="en" value="${esc(cur?cur.name:'La Previa')}" maxlength="60"><label>Fecha y hora</label><input id="ed" type="datetime-local" value="${cur?loc(cur.d):''}"><label>Dirección</label><input id="ea" maxlength="120" placeholder="Calle y número, ciudad" value="${esc(cur?cur.address||'':'')}"><label>Cantidad de entradas a la venta</label><input id="ec" type="number" min="1" inputmode="numeric" placeholder="Ej: 150" value="${cur?cur.capacity:''}"><button id="ecb" class="pri">${cur?'Guardar cambios':'Crear evento'}</button>${cur?' <button id="ecc" class="sm">Cancelar</button>':''}<p id="eer" class="bad"></p></div>
+  main.innerHTML=`<div class="box"><button id="sc" class="pri">📷 Escanear entrada</button><div id="rd"></div><div id="res"></div></div>`+`<div class="grp">Pendientes ( ${pe.length} )</div>`+(pe.length?'':'<div class="empty">No hay solicitudes pendientes.</div>')+pe.map(r=>`<div class="box"><b>${esc(r.profiles?.display_name)}</b> · ${r.quantity} entrada(s) · <small>${evName(r.event_id)}</small><br>${r.tickets.map(t=>esc(t.holder_name)).join(', ')}<br>${r.song_title?'♪ '+esc(r.song_title):'<small>Sin canción</small>'}<br><br><button data-id="${r.id}" data-st="approved" class="pri sm">Aprobar</button> <button data-id="${r.id}" data-st="rejected" class="sm danger">Rechazar</button></div>`).join('')+`  <div class="box" id="evf"><b>${cur?'✏️ Editar evento':'➕ Crear evento'}</b><label>Nombre</label><input id="en" value="${esc(cur?cur.name:'La Previa')}" maxlength="60"><label>Fecha y hora</label><input id="ed" type="datetime-local" value="${cur?loc(cur.d):''}"><label>Dirección</label><input id="ea" maxlength="120" placeholder="Calle y número, ciudad" value="${esc(cur?cur.address||'':'')}"><label>Cantidad de entradas a la venta</label><input id="ec" type="number" min="1" inputmode="numeric" placeholder="Ej: 150" value="${cur?cur.capacity:''}"><button id="ecb" class="pri">${cur?'Guardar cambios':'Crear evento'}</button>${cur?' <button id="ecc" class="sm">Cancelar</button>':''}<p id="eer" class="bad"></p></div>
   <div class="grp">Eventos</div>${ev.error?`<p class="bad ct">Falta ejecutar eventos.sql en Supabase (${esc(ev.error.message)})</p>`:AEV.map(stat).join('')||'<p class="ct">Todavía no creaste ningún evento.</p>'}
-  <div class="box"><b>🎶 Rocola</b><p class="sm">Pegá uno o varios enlaces de YouTube (uno por línea). Suenan al azar junto con las canciones que eligen los invitados con entrada aprobada.</p><textarea id="jl" rows="3" placeholder="https://www.youtube.com/watch?v=..."></textarea><button id="jla" class="pri">Agregar a la rocola</button><p id="jer" class="bad"></p>${jk.error?`<p class="bad">Falta ejecutar rocola.sql en Supabase (${esc(jk.error.message)})</p>`:(jk.data||[]).map(x=>`<div class="ct"><span>♪ ${esc(x.title)}</span><button class="ed sm" data-jd="${x.id}">✕</button></div>`).join('')||'<p class="sm">Todavía no agregaste canciones.</p>'}</div>
-  <div class="grp">Pendientes ( ${pe.length} )</div>`+
-  pe.map(r=>`<div class="box"><b>${esc(r.profiles?.display_name)}</b> · ${r.quantity} entrada(s) · <small>${evName(r.event_id)}</small><br>${r.tickets.map(t=>esc(t.holder_name)).join(', ')}<br>${r.song_title?'♪ '+esc(r.song_title):'<small>Sin canción</small>'}<br><br><button data-id="${r.id}" data-st="approved" class="pri sm">Aprobar</button> <button data-id="${r.id}" data-st="rejected" class="sm danger">Rechazar</button></div>`).join('')+sold;
+  <div class="box"><b>🎶 Rocola</b><p class="sm">Pegá uno o varios enlaces de YouTube (uno por línea). Suenan al azar junto con las canciones que eligen los invitados con entrada aprobada.</p><textarea id="jl" rows="3" placeholder="https://www.youtube.com/watch?v=..."></textarea><button id="jla" class="pri">Agregar a la rocola</button><p id="jer" class="bad"></p>${jk.error?`<p class="bad">Falta ejecutar rocola.sql en Supabase (${esc(jk.error.message)})</p>`:(jk.data||[]).map(x=>`<div class="ct"><span>♪ ${esc(x.title)}</span><button class="ed sm" data-jd="${x.id}">✕</button></div>`).join('')||'<p class="sm">Todavía no agregaste canciones.</p>'}</div>`+sold;
   main.onclick=async e=>{
     const ed=e.target.closest('[data-ed]');if(ed){editId=ed.dataset.ed;await admin();$('#evf').scrollIntoView({behavior:'smooth',block:'center'});return}
     const jd=e.target.closest('[data-jd]');if(jd){jd.disabled=true;const r=await sb.from('jukebox').delete().eq('id',jd.dataset.jd);if(r.error)console.error(r.error);await loadJuke();return admin()}
@@ -375,33 +377,27 @@ function playSong(s){
         drawJuke()},
       onError:()=>{jb.fails++;if(jb.fails<jb.list.length)playSong(pick());else{jb.on=false;jb.err='No se pudieron reproducir las canciones.';drawJuke()}}}})});
   jb.timer=setTimeout(()=>{if(!jb.on){jb.err='Tocá play para empezar';drawJuke()}},5000)}
-const ARM='<svg class="arm" viewBox="0 0 76 104" aria-hidden="true"><circle cx="62" cy="15" r="12" fill="#23232f" stroke="#4a4a5c" stroke-width="1.5"/><circle cx="62" cy="15" r="4.5" fill="#9a97b3"/><path d="M62 15V70L44 92" fill="none" stroke="#d6d3ea" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/><g transform="rotate(-36 42 94)"><rect x="33" y="88" width="19" height="11" rx="2.5" fill="#ff4d8d"/><rect x="38" y="98" width="3" height="5" fill="#fff"/></g></svg>';
-const mkJuke=()=>`<div id="juke"><div class="jglow"></div>
-  <div class="jsign"><b>ROCOLA</b><span class="jshuf">${svg('shuffle')}Aleatoria</span></div>
-  <div class="jdeck"><div class="vwrap"><div class="vinyl"><div class="lb"></div></div>${ARM}</div>
-   <div class="jinfo"><span class="jk" id="jk"></span><b id="jt"></b><span class="jby" id="jby"></span><div class="eq" aria-hidden="true">${Array.from({length:18},(_,i)=>`<i style="--i:${i}"></i>`).join('')}</div></div></div>
+const mkJuke=()=>`<div id="juke"><div class="jrow"><div class="vinyl"><div class="lb"></div></div><div class="jinfo"><span class="jk" id="jk"></span><b id="jt"></b><span class="jby" id="jby"></span></div><button id="jp" class="pri" aria-label="Reproducir"></button></div>
   <div class="jbar"><span id="jc">0:00</span><div class="jtr" id="jtr"><div class="jf" id="jf"></div></div><span id="jd">0:00</span></div>
-  <div class="jctl"><button id="jp" class="pri" aria-label="Reproducir"></button><button id="jx" aria-label="Siguiente canción">${svg('next')}</button><label class="vol" title="Volumen">${svg('vol')}<input id="jv" type="range" min="0" max="100" value="${jb.vol}" aria-label="Volumen"></label></div>
-  <div class="jnx"></div></div>`;
+  <div class="jfoot"><span class="jnext" id="jn"></span><button id="jx" aria-label="Siguiente canción">${svg('next')}</button><label class="vol" title="Volumen">${svg('vol')}<input id="jv" type="range" min="0" max="100" value="${jb.vol}" aria-label="Volumen"></label></div></div>`;
 function bindJuke(){
   $('#jp').onclick=()=>{if(!jb.cur)return playSong(pick());if(!jb.pl)return;if(jb.on)jb.pl.pauseVideo();else jb.pl.playVideo()};
   $('#jx').onclick=()=>playSong(pick());
   $('#jv').oninput=e=>{jb.vol=+e.target.value;try{jb.pl&&jb.pl.setVolume&&jb.pl.setVolume(jb.vol)}catch(x){}};
-  $('#jtr').onclick=e=>{try{if(!jb.pl||!jb.pl.getDuration)return;const d=jb.pl.getDuration(),r=e.currentTarget.getBoundingClientRect();if(d>0)jb.pl.seekTo(Math.min(1,Math.max(0,(e.clientX-r.left)/r.width))*d,true)}catch(x){}};
-  $('#juke .jnx').onclick=e=>{const b=e.target.closest('[data-ji]');if(!b)return;const k=+b.dataset.ji;jb.bag=jb.bag.filter(x=>x!==k);playSong(jb.list[k])}}
+  $('#jtr').onclick=e=>{try{if(!jb.pl||!jb.pl.getDuration)return;const d=jb.pl.getDuration(),r=e.currentTarget.getBoundingClientRect();if(d>0)jb.pl.seekTo(Math.min(1,Math.max(0,(e.clientX-r.left)/r.width))*d,true)}catch(x){}}}
 function upJuke(){
   const j=$('#juke');if(!j)return;
   j.classList.toggle('play',jb.on);j.classList.toggle('has',!!jb.cur);
   const id=jb.cur&&vidId(jb.cur.url);
-  $('#jk').textContent=jb.err?'Aviso':jb.cur?(jb.on?'Sonando ahora':'En pausa'):'Lista para sonar';
-  $('#jt').textContent=jb.err||(jb.cur?jb.cur.title:'Tocá play y que suene algo');
+  $('#jk').textContent=jb.err?'Aviso':jb.cur?(jb.on?'Sonando ahora':'En pausa'):'Rocola';
+  $('#jt').textContent=jb.err||(jb.cur?jb.cur.title:'Tocá play para escuchar música');
   $('#jby').textContent=!jb.err&&jb.cur&&jb.cur.by?'Pedida por '+jb.cur.by:'';
-  const lb=j.querySelector('.lb'),gl=j.querySelector('.jglow'),u=id?thumb(id):'';
-  if(lb.dataset.u!==u){lb.dataset.u=u;lb.style.backgroundImage=u?`url(${u}),linear-gradient(135deg,#ff4d8d,#8b5cf6)`:'';gl.style.backgroundImage=u?`url(${u})`:''}
+  const lb=j.querySelector('.lb'),u=id?thumb(id):'';
+  if(lb.dataset.u!==u){lb.dataset.u=u;lb.style.backgroundImage=u?`url(${u})`:''}
   $('#jp').innerHTML=svg(jb.on?'pause':'play');$('#jp').setAttribute('aria-label',jb.on?'Pausar':'Reproducir');
-  const nx=jb.bag.slice(-3).reverse().map(i=>jb.list[i]).filter(Boolean);
-  upMini();
-  j.querySelector('.jnx').innerHTML=nx.length?`<small>A continuación</small><div class="jq">${nx.map(x=>`<button class="q" data-ji="${jb.list.indexOf(x)}" title="Escuchar ahora">${vidId(x.url)?`<img src="${thumb(vidId(x.url),'default')}" alt="" onerror="this.remove()">`:''}<span>${esc(x.title)}</span></button>`).join('')}</div>`:''}
+  const nx=jb.bag.length?jb.list[jb.bag[jb.bag.length-1]]:null;
+  $('#jn').textContent=nx?'Sigue: '+nx.title:'';
+  upMini()}
 function upMini(){
   const m=$('#mini');if(!m)return;
   if(!jb.cur){m.hidden=true;return}
@@ -410,7 +406,7 @@ function upMini(){
   if(!m.firstChild){m.innerHTML='<div class="mt"></div><div class="mi"><small>Rocola</small><b></b></div><button aria-label="Reproducir/Pausar"></button>';
     m.querySelector('.mi').onclick=()=>go('home');
     m.querySelector('button').onclick=()=>{if(!jb.pl)return;if(jb.on)jb.pl.pauseVideo();else jb.pl.playVideo()}}
-  m.querySelector('.mt').style.backgroundImage=id?`url(${thumb(id)}),linear-gradient(135deg,#ff4d8d,#8b5cf6)`:'';
+  m.querySelector('.mt').style.backgroundImage=id?`url(${thumb(id)})`:'';
   m.querySelector('small').textContent=jb.on?'Sonando ahora':'En pausa';m.querySelector('b').textContent=jb.cur.title;
   const bt=m.querySelector('button');bt.innerHTML=svg(jb.on?'pause':'play');bt.setAttribute('aria-label',jb.on?'Pausar':'Reproducir')}
 function drawJuke(){
@@ -430,5 +426,5 @@ async function loadJuke(){
   lists.flat().forEach(g=>add(g.song_url,g.song_title,g.display_name,'g'+vidId(g.song_url)));
   if(!l.length&&vidId(C.MUSIC_URL||''))l.push({id:'cfg',url:C.MUSIC_URL,title:'Música de La Previa',by:''});
   if(!l.length&&jb.pl){try{jb.pl.stopVideo()}catch(e){}jb.on=false;jb.cur=null}
-  jb.list=l;jb.bag=[];if(jb.cur&&l.length>1)fillBag();drawJuke();if(l.length)idle(loadYT)}
+  jb.list=l;jb.bag=[];if(jb.cur&&l.length>1)fillBag();drawJuke();strip();if(l.length)idle(loadYT)}
 loadJuke();
