@@ -8,6 +8,8 @@ const getTitle=async u=>{
   }return''};
 const dataFile=(u,n)=>{const b=atob(u.split(',')[1]),a=new Uint8Array(b.length);for(let i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return new File([a],n,{type:'image/png'})};
 const qrUrls={};
+const loadScript=u=>new Promise((ok,no)=>{const s=document.createElement('script');s.src=u;s.onload=ok;s.onerror=no;document.head.appendChild(s)});
+const idle=f=>{const go=()=>('requestIdleCallback' in window?requestIdleCallback(f,{timeout:4000}):setTimeout(f,2500));if(document.readyState==='complete')setTimeout(go,1200);else addEventListener('load',()=>setTimeout(go,1200),{once:true})};
 
 const ICO={
  home:'<path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/><path d="M10 19.5v-5h4v5"/>',
@@ -72,14 +74,24 @@ function head(){
   if($('#out'))$('#out').onclick=()=>sb.auth.signOut();
   if($('#in'))$('#in').onclick=()=>authView('login');if($('#up'))$('#up').onclick=()=>authView('signup');mark();badge()}
 $('#brand').onclick=e=>{e.preventDefault();go('home')};
-$('#evbox').onpointermove=e=>{const h=e.target.closest('.hero');if(!h)return;const r=h.getBoundingClientRect();h.style.setProperty('--mx',(e.clientX-r.left)+'px');h.style.setProperty('--my',(e.clientY-r.top)+'px')};
+if(matchMedia('(hover:hover)').matches){let raf=0;$('#evbox').onpointermove=e=>{if(raf)return;const h=e.target.closest('.hero');if(!h)return;const x=e.clientX,y=e.clientY;raf=requestAnimationFrame(()=>{raf=0;const r=h.getBoundingClientRect();h.style.setProperty('--mx',(x-r.left)+'px');h.style.setProperty('--my',(y-r.top)+'px')})}}
 $('#evbox').onclick=e=>{const b=e.target.closest('#cta');if(b&&!b.disabled)want(b.dataset.ev)};
 function go(v){view=v;mark();main.onclick=null;({home:home,list:home,form:()=>want(selEv),mine:mine,admin:admin,auth:()=>authView('login'),recover:recoverView,contact:contactView}[v]||home)()}
 
 /* ---------- eventos ---------- */
-async function loadEvents(){
-  const{data,error}=await sb.rpc('get_events');if(error)console.error('eventos',error);
-  EV=(data||[]).map(e=>({...e,d:new Date(e.event_at)}));updateCta();return EV}
+let evP=null,evAt=0,LST={};
+const bust=()=>{evAt=0;LST={}};
+function loadEvents(force){
+  if(evP)return evP;
+  if(!force&&evAt&&Date.now()-evAt<20000)return Promise.resolve(EV);
+  evP=(async()=>{const{data,error}=await sb.rpc('get_events');if(error)console.error('eventos',error);
+    EV=(data||[]).map(e=>({...e,d:new Date(e.event_at)}));evAt=Date.now();updateCta();return EV})().finally(()=>{evP=null});
+  return evP}
+function getList(id){
+  const c=LST[id];if(c&&(c.p||Date.now()-c.t<20000))return c.p||Promise.resolve(c.v);
+  const p=Promise.resolve(sb.rpc('public_event_list',{p_event_id:id})).then(r=>{LST[id]={t:Date.now(),v:r.data||[]};return LST[id].v},()=>{LST[id]={t:Date.now(),v:[]};return[]});
+  LST[id]={p,t:Date.now(),v:[]};return p}
+loadEvents();
 const upcoming=()=>EV.filter(e=>e.d.getTime()>Date.now()-12*36e5);
 const feat=()=>{const u=upcoming();return u.find(e=>!e.sold_out)||u[0]||null};
 const mapLink=a=>'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(a);
@@ -150,15 +162,16 @@ function recoverView(){
     main.innerHTML='<div class="box"><h3 class="ok">Contraseña actualizada ✔</h3></div>';setTimeout(()=>go('home'),1500)}}
 
 /* ---------- inicio ---------- */
-const guest=(r,i)=>`<div class="guest" style="--i:${i}"><i class="av" style="${avc(r.display_name)}">${esc((r.display_name||'?').trim().charAt(0).toUpperCase())}</i><div class="gm"><b>${esc(r.display_name)}</b>${yt(r.song_url)?`<a class="song" href="${esc(r.song_url)}" target="_blank" rel="noopener">${svg('note')}<span>${esc(r.song_title)}</span></a>`:`<span class="song">${svg('note')}<span>${esc(r.song_title)}</span></span>`}</div></div>`;
+const guest=(r,i)=>{const t=r.song_title||'Canción de YouTube',sg=(r.song_url||r.song_title)?(yt(r.song_url)?`<a class="song" href="${esc(r.song_url)}" target="_blank" rel="noopener">${svg('note')}<span>${esc(t)}</span></a>`:`<span class="song">${svg('note')}<span>${esc(t)}</span></span>`):'';
+  return `<div class="guest" style="--i:${i}"><i class="av" style="${avc(r.display_name)}">${esc((r.display_name||'?').trim().charAt(0).toUpperCase())}</i><div class="gm"><b>${esc(r.display_name)}</b>${sg}</div></div>`};
 async function home(){
   main.innerHTML=skel;
   await loadEvents();const ups=upcoming(),f=feat();
   if(!ups.length){if(view==='home'||view==='list')main.innerHTML='<div class="empty">Todavía no hay una fecha confirmada.<b>¡Volvé pronto!</b></div>';return}
   const order=[f,...ups.filter(e=>e!==f)];
-  const ls=await Promise.all(order.map(e=>sb.rpc('public_event_list',{p_event_id:e.id})));
+  const ls=await Promise.all(order.map(e=>getList(e.id)));
   if(view!=='home'&&view!=='list')return;
-  main.innerHTML=order.map((e,i)=>{const data=ls[i].data||[];return (i?evCard(e):'')+`<div class="sec"><h2>Conectados${order.length>1?` · ${esc(e.name)}`:''}</h2><span class="cnt">${data.length}</span></div>`+
+  main.innerHTML=order.map((e,i)=>{const data=ls[i]||[];return (i?evCard(e):'')+`<div class="sec"><h2>Conectados${order.length>1?` · ${esc(e.name)}`:''}</h2><span class="cnt">${data.length}</span></div>`+
     (data.map((r,k)=>guest(r,k)).join('')||'<div class="empty">Todavía no hay nadie anotado.<b>¡Sé el primero!</b></div>')}).join('');
   main.onclick=e=>{const b=e.target.closest('[data-ev]');if(b)want(b.dataset.ev)}}
 
@@ -185,7 +198,7 @@ async function renderForm(ev){
   <div class="evmini${showEv?'':' dup'}"><b>${esc(ev.name)}</b><div class="evd">${evInfo(ev)}</div>${evPill(ev)}</div>
   <label>Tu nombre en la lista</label><input id="dn" maxlength="30" value="${esc(p?.display_name||user.user_metadata?.full_name||'')}">
   <label>Cantidad de entradas</label><div class="step"><button type="button" id="qm" aria-label="Menos">−</button><b id="qv">1</b><button type="button" id="qp" aria-label="Más">+</button><small>máx. ${max}</small></div><div id="nm"></div>
-  <label>Canción que no puede faltar</label><input id="su" placeholder="Pegá el enlace de YouTube"><div id="sp" class="sp"></div><input id="st" placeholder="Nombre de la canción" maxlength="150" hidden>
+  <label>Agregá una canción que no puede faltar<span class="opt">Opcional</span></label><p class="hint">Se suma a la rocola de la fiesta cuando aprobemos tu entrada.</p><input id="su" placeholder="Pegá el enlace de YouTube"><div id="sp" class="sp"></div><input id="st" placeholder="Nombre de la canción" maxlength="150" hidden>
   <br><button id="go" class="pri big">Enviar solicitud</button><p id="er"></p></div>`;
   const names=()=>{const old=[...document.querySelectorAll('.nm')].map(i=>i.value);$('#nm').innerHTML=Array.from({length:qty},(_,i)=>`<input class="nm" placeholder="Nombre y apellido de la entrada ${i+1}" maxlength="40" value="${esc(old[i]||'')}">`).join('')};
   const setQ=n=>{qty=Math.min(max,Math.max(1,n));$('#qv').textContent=qty;names()};
@@ -204,16 +217,20 @@ async function renderForm(ev){
   $('#go').onclick=async()=>{
     const dn=$('#dn').value.trim(),q=qty,ns=[...document.querySelectorAll('.nm')].map(i=>i.value.trim()),su=$('#su').value.trim(),er=m=>$('#er').textContent=m;
     if(!dn||ns.some(n=>!n))return er('Completá tu nombre y el nombre de cada entrada.');
-    if(!yt(su))return er('Pegá un enlace de YouTube válido.');
+    if(su&&!yt(su))return er('Pegá un enlace de YouTube válido, o dejá la canción vacía.');
     $('#go').disabled=true;er('');
-    let st=$('#st').value.trim();
-    if(!st){er('Buscando el título de la canción…');st=await getTitle(su);er('')}
-    if(!st){$('#st').hidden=false;$('#go').disabled=false;return er('No pudimos leer el título. Escribilo en el cuadro de abajo.')}
+    let st='';
+    if(su){st=$('#st').value.trim();
+      if(!st){er('Buscando el título de la canción…');st=await getTitle(su);er('')}
+      if(!st){$('#st').hidden=false;$('#go').disabled=false;return er('No pudimos leer el título. Escribilo en el cuadro de abajo, o dejá la canción vacía.')}}
     let r=await sb.from('profiles').upsert({id:user.id,display_name:dn});if(r.error){$('#go').disabled=false;return er('No se pudo guardar tu nombre.')}
-    r=await sb.from('requests').insert({user_id:user.id,event_id:ev.id,quantity:q,song_title:st,song_url:su}).select().single();if(r.error){console.error(r.error);$('#go').disabled=false;return er('No se pudo enviar la solicitud.')}
+    const mk=(a,b)=>({user_id:user.id,event_id:ev.id,quantity:q,song_title:a,song_url:b});
+    r=await sb.from('requests').insert(mk(st||null,su||null)).select().single();
+    if(r.error&&r.error.code==='23502')r=await sb.from('requests').insert(mk(st||'',su||'')).select().single();
+    if(r.error){console.error(r.error);$('#go').disabled=false;return er('No se pudo enviar la solicitud.')}
     const t=await sb.from('tickets').insert(ns.map(n=>({request_id:r.data.id,user_id:user.id,holder_name:n})));if(t.error){$('#go').disabled=false;return er('No se pudieron guardar los nombres.')}
     const w=`https://wa.me/${C.WHATSAPP}?text=`+encodeURIComponent(`Hola! Quiero ${q} entrada${q>1?'s':''} para ${ev.name} del ${fshort(ev.d)} a nombre de:\n`+ns.map(n=>'- '+n).join('\n'));
-    main.innerHTML=`<div class="box"><h3>¡Solicitud enviada! 🎉</h3><p class="hello">Abrimos WhatsApp para avisar. Cuando la aprueben, vas a ver tus QR en "Mis entradas": quedan guardados en tu cuenta.</p><a class="bt pri big" href="${w}">Abrir WhatsApp</a></div>`;confetti();setTimeout(()=>location.href=w,2600)}}
+    bust();main.innerHTML=`<div class="box"><h3>¡Solicitud enviada! 🎉</h3><p class="hello">Abrimos WhatsApp para avisar. Cuando la aprueben, vas a ver tus QR en "Mis entradas": quedan guardados en tu cuenta.</p><a class="bt pri big" href="${w}">Abrir WhatsApp</a></div>`;confetti();setTimeout(()=>location.href=w,2600)}}
 
 /* ---------- mis entradas (historial por evento) ---------- */
 async function mine(){
@@ -229,8 +246,8 @@ async function mine(){
     :!t.qr_code?`<div class="row"><span>${esc(t.holder_name)}</span><small class="bad">QR no disponible, avisá al organizador</small></div>`
     :`<div class="stub${t.checked_in?' used':''}"><div class="sl"><small>${e?esc(e.name):'La Previa'}</small><b>${esc(t.holder_name)}</b><span class="sd">${e?`${esc(fshort(e.d))} · ${ftime(e.d)}`:''}</span><button class="sm" data-s="${esc(t.qr_code)}" data-n="${esc(t.holder_name)}">${svg('share')}Compartir</button></div><div class="perf"></div><div class="sr"><img data-q="${esc(t.qr_code)}" alt="Código QR de ${esc(t.holder_name)}"><span class="stat">${t.checked_in?'Ya ingresó':'Entrada válida'}</span></div></div>`;
   const box=(r,e)=>`<div class="req"><div class="reqh">${chip(r.status)}<small>${r.quantity} entrada${r.quantity>1?'s':''}</small></div>${(r.tickets||[]).map(t=>stub(r,t,e)).join('')}
-    <div class="songrow">${svg('note')}${yt(r.song_url)?`<a class="song" href="${esc(r.song_url)}" target="_blank" rel="noopener"><span>${esc(r.song_title)}</span></a>`:`<span class="song"><span>${esc(r.song_title)}</span></span>`}<button class="sm" data-tg="${r.id}">Cambiar</button></div>
-    <div class="songedit" data-ed2="${r.id}"><input data-su="${r.id}" value="${esc(r.song_url)}" placeholder="Pegá el enlace de YouTube de tu nueva canción"><div class="r"><button class="sm pri" data-sv="${r.id}">Guardar nueva canción</button></div><p class="sm" data-sm="${r.id}"></p></div></div>`;
+    <div class="songrow">${svg('note')}${(r.song_url||r.song_title)?(yt(r.song_url)?`<a class="song" href="${esc(r.song_url)}" target="_blank" rel="noopener"><span>${esc(r.song_title||'Canción de YouTube')}</span></a>`:`<span class="song"><span>${esc(r.song_title)}</span></span>`):'<span class="song mu"><span>Sin canción todavía</span></span>'}<button class="sm" data-tg="${r.id}">${(r.song_url||r.song_title)?'Cambiar':'Agregar'}</button></div>
+    <div class="songedit" data-ed2="${r.id}"><input data-su="${r.id}" value="${esc(r.song_url||'')}" placeholder="Pegá el enlace de YouTube de tu canción"><div class="r"><button class="sm pri" data-sv="${r.id}">Guardar canción</button></div><p class="sm" data-sm="${r.id}"></p></div></div>`;
   const title=g=>g.e?`<div class="sec"><h2>Entradas para ${esc(g.e.name)}</h2><span class="cnt plain">${esc(fshort(g.e.d))} · ${ftime(g.e.d)}</span>${g.e.d.getTime()<Date.now()-12*36e5?'<span class="chip wait">Finalizado</span>':''}</div>`:'<div class="sec"><h2>Entradas anteriores</h2></div>';
   main.innerHTML=`<div class="sec" style="margin-top:6px"><h2>Mis entradas</h2><button id="rf" class="sm" style="margin-left:auto">↻ Actualizar</button></div>`+(groups.map(g=>title(g)+g.rs.map(r=>box(r,g.e)).join('')).join('')||'<div class="empty">Todavía no pediste entradas.<b>Cuando las pidas, van a aparecer acá.</b></div>');
   document.querySelectorAll('[data-q]').forEach(async i=>{
@@ -273,16 +290,16 @@ async function admin(){
   main.innerHTML=`<div class="box"><button id="sc" class="pri">📷 Escanear entrada</button><div id="rd"></div><div id="res"></div></div>
   <div class="box" id="evf"><b>${cur?'✏️ Editar evento':'➕ Crear evento'}</b><label>Nombre</label><input id="en" value="${esc(cur?cur.name:'La Previa')}" maxlength="60"><label>Fecha y hora</label><input id="ed" type="datetime-local" value="${cur?loc(cur.d):''}"><label>Dirección</label><input id="ea" maxlength="120" placeholder="Calle y número, ciudad" value="${esc(cur?cur.address||'':'')}"><label>Cantidad de entradas a la venta</label><input id="ec" type="number" min="1" inputmode="numeric" placeholder="Ej: 150" value="${cur?cur.capacity:''}"><button id="ecb" class="pri">${cur?'Guardar cambios':'Crear evento'}</button>${cur?' <button id="ecc" class="sm">Cancelar</button>':''}<p id="eer" class="bad"></p></div>
   <div class="grp">Eventos</div>${ev.error?`<p class="bad ct">Falta ejecutar eventos.sql en Supabase (${esc(ev.error.message)})</p>`:AEV.map(stat).join('')||'<p class="ct">Todavía no creaste ningún evento.</p>'}
-  <div class="box"><b>🎶 Rocola</b><p class="sm">Pegá uno o varios enlaces de YouTube (uno por línea). En la página suena una canción al azar y pasa a la siguiente cuando termina.</p><textarea id="jl" rows="3" placeholder="https://www.youtube.com/watch?v=..."></textarea><button id="jla" class="pri">Agregar a la rocola</button><p id="jer" class="bad"></p>${jk.error?`<p class="bad">Falta ejecutar rocola.sql en Supabase (${esc(jk.error.message)})</p>`:(jk.data||[]).map(x=>`<div class="ct"><span>♪ ${esc(x.title)}</span><button class="ed sm" data-jd="${x.id}">✕</button></div>`).join('')||'<p class="sm">Todavía no agregaste canciones.</p>'}</div>
+  <div class="box"><b>🎶 Rocola</b><p class="sm">Pegá uno o varios enlaces de YouTube (uno por línea). Suenan al azar junto con las canciones que eligen los invitados con entrada aprobada.</p><textarea id="jl" rows="3" placeholder="https://www.youtube.com/watch?v=..."></textarea><button id="jla" class="pri">Agregar a la rocola</button><p id="jer" class="bad"></p>${jk.error?`<p class="bad">Falta ejecutar rocola.sql en Supabase (${esc(jk.error.message)})</p>`:(jk.data||[]).map(x=>`<div class="ct"><span>♪ ${esc(x.title)}</span><button class="ed sm" data-jd="${x.id}">✕</button></div>`).join('')||'<p class="sm">Todavía no agregaste canciones.</p>'}</div>
   <div class="grp">Pendientes ( ${pe.length} )</div>`+
-  pe.map(r=>`<div class="box"><b>${esc(r.profiles?.display_name)}</b> · ${r.quantity} entrada(s) · <small>${evName(r.event_id)}</small><br>${r.tickets.map(t=>esc(t.holder_name)).join(', ')}<br>♪ ${esc(r.song_title)}<br><br><button data-id="${r.id}" data-st="approved" class="pri sm">Aprobar</button> <button data-id="${r.id}" data-st="rejected" class="sm danger">Rechazar</button></div>`).join('')+sold;
+  pe.map(r=>`<div class="box"><b>${esc(r.profiles?.display_name)}</b> · ${r.quantity} entrada(s) · <small>${evName(r.event_id)}</small><br>${r.tickets.map(t=>esc(t.holder_name)).join(', ')}<br>${r.song_title?'♪ '+esc(r.song_title):'<small>Sin canción</small>'}<br><br><button data-id="${r.id}" data-st="approved" class="pri sm">Aprobar</button> <button data-id="${r.id}" data-st="rejected" class="sm danger">Rechazar</button></div>`).join('')+sold;
   main.onclick=async e=>{
     const ed=e.target.closest('[data-ed]');if(ed){editId=ed.dataset.ed;await admin();$('#evf').scrollIntoView({behavior:'smooth',block:'center'});return}
     const jd=e.target.closest('[data-jd]');if(jd){jd.disabled=true;const r=await sb.from('jukebox').delete().eq('id',jd.dataset.jd);if(r.error)console.error(r.error);await loadJuke();return admin()}
     const b=e.target.closest('[data-id]');if(!b)return;b.disabled=true;
     const r=b.dataset.st=='approved'?await sb.rpc('approve_request',{p_request_id:String(b.dataset.id)}):await sb.from('requests').update({status:b.dataset.st}).eq('id',b.dataset.id);
     if(r.error){console.error(r.error);alert(/sold_out/.test(r.error.message)?'No quedan entradas suficientes en ese evento para aprobar esta solicitud.':'No se pudo actualizar. Probá de nuevo.')}
-    admin();badge()};
+    bust();admin();badge();loadJuke()};
   $('#ecb').onclick=async()=>{
     const n=$('#en').value.trim(),d=$('#ed').value,c=parseInt($('#ec').value,10),er=m=>$('#eer').textContent=m;
     if(!n||!d||!(c>0))return er('Completá nombre, fecha y hora, y una cantidad mayor a 0.');
@@ -290,7 +307,7 @@ async function admin(){
     $('#ecb').disabled=true;const row={name:n,event_at:new Date(d).toISOString(),capacity:c,address:$('#ea').value.trim()};
     const{error}=editId?await sb.from('events').update(row).eq('id',editId):await sb.from('events').insert(row);
     if(error){console.error(error);$('#ecb').disabled=false;return er('No se pudo guardar el evento ('+error.message+')')}
-    editId=null;admin()};
+    editId=null;bust();admin()};
   if($('#ecc'))$('#ecc').onclick=()=>{editId=null;admin()};
   $('#jla').onclick=async()=>{
     const er=(m,c='bad')=>{$('#jer').className=c;$('#jer').textContent=m},urls=$('#jl').value.split(/\s+/).filter(Boolean),seen=new Set((jk.data||[]).map(x=>vidId(x.url)));
@@ -304,9 +321,13 @@ async function admin(){
     await loadJuke();admin()};
   $('#sc').onclick=scan}
 const otherEv=t=>{const e=AEV.find(x=>x.id==t.requests?.event_id);return e&&Math.abs(Date.now()-e.d.getTime())>24*36e5?e:null};
-function scan(){
+async function scan(){
   const res=$('#res');res.textContent='';
-  if(typeof Html5Qrcode==='undefined')return res.innerHTML='<p class="bad">La librería del escáner no cargó. Revisá tu conexión y recargá la página.</p>';
+  if(typeof Html5Qrcode==='undefined'){
+    res.innerHTML='<p class="sm">Cargando el escáner…</p>';
+    try{await loadScript('https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js')}catch(e){}
+    if(typeof Html5Qrcode==='undefined')return res.innerHTML='<p class="bad">La librería del escáner no cargó. Revisá tu conexión y volvé a tocar "Escanear".</p>';
+    res.textContent=''}
   const h=new Html5Qrcode('rd');
   h.start({facingMode:'environment'},{fps:10,qrbox:220},async txt=>{
     await h.stop();const{data:t,error}=await sb.from('tickets').select('*,requests(status,event_id)').eq('qr_code',txt).maybeSingle();
@@ -358,7 +379,7 @@ const ARM='<svg class="arm" viewBox="0 0 76 104" aria-hidden="true"><circle cx="
 const mkJuke=()=>`<div id="juke"><div class="jglow"></div>
   <div class="jsign"><b>ROCOLA</b><span class="jshuf">${svg('shuffle')}Aleatoria</span></div>
   <div class="jdeck"><div class="vwrap"><div class="vinyl"><div class="lb"></div></div>${ARM}</div>
-   <div class="jinfo"><span class="jk" id="jk"></span><b id="jt"></b><div class="eq" aria-hidden="true">${Array.from({length:18},(_,i)=>`<i style="--i:${i}"></i>`).join('')}</div></div></div>
+   <div class="jinfo"><span class="jk" id="jk"></span><b id="jt"></b><span class="jby" id="jby"></span><div class="eq" aria-hidden="true">${Array.from({length:18},(_,i)=>`<i style="--i:${i}"></i>`).join('')}</div></div></div>
   <div class="jbar"><span id="jc">0:00</span><div class="jtr" id="jtr"><div class="jf" id="jf"></div></div><span id="jd">0:00</span></div>
   <div class="jctl"><button id="jp" class="pri" aria-label="Reproducir"></button><button id="jx" aria-label="Siguiente canción">${svg('next')}</button><label class="vol" title="Volumen">${svg('vol')}<input id="jv" type="range" min="0" max="100" value="${jb.vol}" aria-label="Volumen"></label></div>
   <div class="jnx"></div></div>`;
@@ -374,6 +395,7 @@ function upJuke(){
   const id=jb.cur&&vidId(jb.cur.url);
   $('#jk').textContent=jb.err?'Aviso':jb.cur?(jb.on?'Sonando ahora':'En pausa'):'Lista para sonar';
   $('#jt').textContent=jb.err||(jb.cur?jb.cur.title:'Tocá play y que suene algo');
+  $('#jby').textContent=!jb.err&&jb.cur&&jb.cur.by?'Pedida por '+jb.cur.by:'';
   const lb=j.querySelector('.lb'),gl=j.querySelector('.jglow'),u=id?thumb(id):'';
   if(lb.dataset.u!==u){lb.dataset.u=u;lb.style.backgroundImage=u?`url(${u}),linear-gradient(135deg,#ff4d8d,#8b5cf6)`:'';gl.style.backgroundImage=u?`url(${u})`:''}
   $('#jp').innerHTML=svg(jb.on?'pause':'play');$('#jp').setAttribute('aria-label',jb.on?'Pausar':'Reproducir');
@@ -398,10 +420,15 @@ function drawJuke(){
   upJuke()}
 setInterval(()=>{const f=$('#jf');if(!f||!jb.pl||!jb.pl.getDuration||!jb.cur)return;try{const d=jb.pl.getDuration(),c=jb.pl.getCurrentTime();if(d>0){f.style.width=(c/d*100)+'%';$('#jc').textContent=fmtT(c);$('#jd').textContent=fmtT(d)}}catch(e){}},400);
 async function loadJuke(){
-  const{data,error}=await sb.from('jukebox').select('*').order('created_at');
+  const jrP=Promise.resolve(sb.from('jukebox').select('*').order('created_at'));
+  await loadEvents();
+  const lists=await Promise.all(upcoming().map(e=>getList(e.id)));
+  const{data,error}=await jrP;
   if(error)console.error('rocola',error);
-  let l=(data||[]).filter(x=>vidId(x.url));
-  if(!l.length&&vidId(C.MUSIC_URL||''))l=[{id:'cfg',url:C.MUSIC_URL,title:'Música de La Previa'}];
+  const seen=new Set(),l=[],add=(url,title,by,id)=>{const v=vidId(url||'');if(!v||seen.has(v))return;seen.add(v);l.push({id,url,title:title||'Canción de YouTube',by:by||''})};
+  (data||[]).forEach(x=>add(x.url,x.title,'',x.id));
+  lists.flat().forEach(g=>add(g.song_url,g.song_title,g.display_name,'g'+vidId(g.song_url)));
+  if(!l.length&&vidId(C.MUSIC_URL||''))l.push({id:'cfg',url:C.MUSIC_URL,title:'Música de La Previa',by:''});
   if(!l.length&&jb.pl){try{jb.pl.stopVideo()}catch(e){}jb.on=false;jb.cur=null}
-  jb.list=l;jb.bag=[];if(jb.cur&&l.length>1)fillBag();drawJuke();if(l.length)loadYT()}
+  jb.list=l;jb.bag=[];if(jb.cur&&l.length>1)fillBag();drawJuke();if(l.length)idle(loadYT)}
 loadJuke();
