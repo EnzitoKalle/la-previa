@@ -36,6 +36,7 @@ const avc=n=>{let h=0;for(const c of String(n))h=(h*31+c.charCodeAt(0))%360;retu
 const skel='<div class="sk h"></div><div class="sk"></div><div class="sk"></div>';
 let user=null,view='home',ready=0,last=null,selEv=null,afterV=null,EV=[],AEV=[];
 const isAdmin=()=>user&&user.email===C.ADMIN_EMAIL;
+const acct=()=>user&&!user.is_anonymous;
 const mark=()=>{const v=view==='list'?'home':view;document.body.dataset.view=v;document.querySelectorAll('#mb a').forEach(a=>a.classList.toggle('on',a.dataset.v===v))};
 const fdate=d=>d.toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'});
 const fshort=d=>d.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',...(d.getFullYear()!=new Date().getFullYear()?{year:'numeric'}:{})});
@@ -48,12 +49,14 @@ const authErr=e=>{const m=String(e&&e.message||e);
   if(/rate limit|too many|seconds/i.test(m))return'Hay muchos intentos seguidos. Esperá un ratito y probá de nuevo.';
   if(/password/i.test(m))return'La contraseña debe tener al menos 6 caracteres.';
   if(/signups? (not allowed|are disabled)|signup.*disabled|provider.*(disabled|not enabled)/i.test(m))return'El registro con email todavía no está habilitado. Probá con Google o avisale al organizador.';
+  if(/anonymous.*(disabled|not allowed)|anonymous sign/i.test(m))return'Por ahora no se puede pedir sin cuenta. Creá una cuenta o ingresá para continuar.';
   if(/(invalid|unable to validate).*email|email.*invalid/i.test(m))return'Ese email no es válido. Revisalo, por favor.';
   console.error('auth',e);
   return'No se pudo completar ('+m+'). Si sigue, avisale al organizador.'};
 sb.auth.onAuthStateChange((ev,s)=>{
   const u=s?s.user:null;
   if(ev==='PASSWORD_RECOVERY'){user=u;ready=1;head();setTimeout(recoverView,0);return}
+  if(u&&u.is_anonymous&&ready&&!(user&&user.id===u.id)){user=u;return}
   if(ready&&(u&&u.id)===(user&&user.id))return;
   user=u;ready=1;
   if(u){try{const a=sessionStorage.getItem('lp_after');if(a){view=a;selEv=sessionStorage.getItem('lp_ev')||null}sessionStorage.removeItem('lp_after');sessionStorage.removeItem('lp_ev')}catch(e){}
@@ -64,8 +67,8 @@ function head(){
   $('#mb').innerHTML=items.map(([v,t,i])=>`<a data-v="${v}" role="button" tabindex="0">${svg(i)}<span>${t}</span></a>`).join('');
   $('#mb').onclick=e=>{const v=e.target.closest('a')?.dataset.v;if(v)go(v)};
   $('#mb').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){const v=e.target.closest('a')?.dataset.v;if(v){e.preventDefault();go(v)}}};
-  const nm=user?(user.user_metadata?.full_name||user.email||''):'';
-  $('#me').innerHTML=user?`<span class="who"><i class="av" style="${avc(nm)}">${esc(nm.trim().charAt(0).toUpperCase()||'?')}</i><span>${esc(nm)}</span></span><a id="out" class="lk" role="button" tabindex="0">Salir</a>`:'<button class="bt" id="in">Ingresar</button><button class="bt pri" id="up">Registrarse</button>';
+  const nm=acct()?(user.user_metadata?.full_name||user.email||''):'';
+  $('#me').innerHTML=acct()?`<span class="who"><i class="av" style="${avc(nm)}">${esc(nm.trim().charAt(0).toUpperCase()||'?')}</i><span>${esc(nm)}</span></span><a id="out" class="lk" role="button" tabindex="0">Salir</a>`:'<button class="bt" id="in">Ingresar</button><button class="bt pri" id="up">Registrarse</button>';
   if($('#out'))$('#out').onclick=()=>sb.auth.signOut();
   if($('#in'))$('#in').onclick=()=>authView('login');if($('#up'))$('#up').onclick=()=>authView('signup');mark();badge()}
 $('#brand').onclick=e=>{e.preventDefault();go('home')};
@@ -194,15 +197,16 @@ async function want(id){
   const e=id?open.find(x=>x.id==id):(open.length==1?open[0]:null);
   if(!e)return go('home');
   selEv=e.id;
-  if(!user)return authView('signup','Registrate para que te quede guardado el QR de tu entrada. Si no te registrás, no podemos guardártelo.','form');
   view='form';mark();main.onclick=null;renderForm(e)}
 async function renderForm(ev){
-  const{data:p}=await sb.from('profiles').select('display_name').eq('id',user.id).maybeSingle();
+  const p=user?(await sb.from('profiles').select('display_name').eq('id',user.id).maybeSingle()).data:null;
   const max=Math.min(10,ev.remaining_low||10),showEv=!feat()||feat().id!==ev.id;let qty=1;
   main.innerHTML=`<div class="box"><h3>Quiero una entrada</h3>
+  ${acct()?'':'<p class="hello">No necesitás cuenta: te mandamos las entradas por WhatsApp apenas las aprobemos.</p>'}
   <div class="evmini${showEv?'':' dup'}"><b>${esc(ev.name)}</b><div class="evd">${evInfo(ev)}</div>${evPill(ev)}</div>
-  <label>Tu nombre en la lista</label><input id="dn" maxlength="30" value="${esc(p?.display_name||user.user_metadata?.full_name||'')}">
+  <label>Tu nombre en la lista</label><input id="dn" maxlength="30" value="${esc(p?.display_name||user?.user_metadata?.full_name||'')}">
   <label>Cantidad de entradas</label><div class="step"><button type="button" id="qm" aria-label="Menos">−</button><b id="qv">1</b><button type="button" id="qp" aria-label="Más">+</button><small>máx. ${max}</small></div><div id="nm"></div>
+  <label>Tu WhatsApp<span class="opt">para enviarte las entradas</span></label><input id="ct" type="tel" inputmode="tel" autocomplete="tel" maxlength="30" placeholder="Ej: 2262 123456">
   <label>Agregá una canción que no puede faltar<span class="opt">Opcional</span></label><p class="hint">Se suma a la rocola de la fiesta cuando aprobemos tu entrada.</p><input id="su" placeholder="Pegá el enlace de YouTube"><div id="sp" class="sp"></div><input id="st" placeholder="Nombre de la canción" maxlength="150" hidden>
   <br><button id="go" class="pri big">Enviar solicitud</button><p id="er"></p></div>`;
   const names=()=>{const old=[...document.querySelectorAll('.nm')].map(i=>i.value);$('#nm').innerHTML=Array.from({length:qty},(_,i)=>`<input class="nm" placeholder="Nombre y apellido de la entrada ${i+1}" maxlength="40" value="${esc(old[i]||'')}">`).join('')};
@@ -221,21 +225,32 @@ async function renderForm(ev){
   $('#su').oninput=()=>{clearTimeout(tm);tm=setTimeout(peek,500)};
   $('#go').onclick=async()=>{
     const dn=$('#dn').value.trim(),q=qty,ns=[...document.querySelectorAll('.nm')].map(i=>i.value.trim()),su=$('#su').value.trim(),er=m=>$('#er').textContent=m;
+    const ph=$('#ct').value.trim();
     if(!dn||ns.some(n=>!n))return er('Completá tu nombre y el nombre de cada entrada.');
+    if(ph.replace(/\D/g,'').length<8)return er('Poné tu número de WhatsApp para poder enviarte las entradas.');
     if(su&&!yt(su))return er('Pegá un enlace de YouTube válido, o dejá la canción vacía.');
     $('#go').disabled=true;er('');
     let st='';
     if(su){st=$('#st').value.trim();
       if(!st){er('Buscando el título de la canción…');st=await getTitle(su);er('')}
       if(!st){$('#st').hidden=false;$('#go').disabled=false;return er('No pudimos leer el título. Escribilo en el cuadro de abajo, o dejá la canción vacía.')}}
-    let r=await sb.from('profiles').upsert({id:user.id,display_name:dn});if(r.error){$('#go').disabled=false;return er('No se pudo guardar tu nombre.')}
-    const mk=(a,b)=>({user_id:user.id,event_id:ev.id,quantity:q,song_title:a,song_url:b});
-    r=await sb.from('requests').insert(mk(st||null,su||null)).select().single();
-    if(r.error&&r.error.code==='23502')r=await sb.from('requests').insert(mk(st||'',su||'')).select().single();
+    if(!user){
+      const a=await sb.auth.signInAnonymously();
+      if(a.error||!a.data||!a.data.user){console.error(a.error);$('#go').disabled=false;return er(a.error?authErr(a.error):'No pudimos iniciar tu pedido. Probá de nuevo.')}
+      user=a.data.user}
+    let r=await sb.from('profiles').upsert({id:user.id,display_name:dn});if(r.error){console.error(r.error);$('#go').disabled=false;return er('No se pudo guardar tu nombre.')}
+    let useC=true,empty=false;
+    for(let k=0;k<4;k++){
+      const row={user_id:user.id,event_id:ev.id,quantity:q,song_title:st||(empty?'':null),song_url:su||(empty?'':null)};if(useC)row.contact=ph;
+      r=await sb.from('requests').insert(row).select().single();if(!r.error)break;
+      const code=r.error.code,msg=String(r.error.message||'');
+      if(useC&&(code==='42703'||code==='PGRST204'||/contact/i.test(msg))){useC=false;continue}
+      if(code==='23502'&&!empty){empty=true;continue}
+      break}
     if(r.error){console.error(r.error);$('#go').disabled=false;return er('No se pudo enviar la solicitud.')}
     const t=await sb.from('tickets').insert(ns.map(n=>({request_id:r.data.id,user_id:user.id,holder_name:n})));if(t.error){$('#go').disabled=false;return er('No se pudieron guardar los nombres.')}
-    const w=`https://wa.me/${C.WHATSAPP}?text=`+encodeURIComponent(`Hola! Quiero ${q} entrada${q>1?'s':''} para ${ev.name} del ${fshort(ev.d)} a nombre de:\n`+ns.map(n=>'- '+n).join('\n'));
-    bust();main.innerHTML=`<div class="box"><h3>¡Solicitud enviada!</h3><p class="hello">Abrimos WhatsApp para avisar. Cuando la aprueben, vas a ver tus QR en "Mis entradas": quedan guardados en tu cuenta.</p><a class="bt pri big" href="${w}">Abrir WhatsApp</a></div>`;setTimeout(()=>location.href=w,1800)}}
+    const w=`https://wa.me/${C.WHATSAPP}?text=`+encodeURIComponent(`Hola! Quiero ${q} entrada${q>1?'s':''} para ${ev.name} del ${fshort(ev.d)} a nombre de:\n`+ns.map(n=>'- '+n).join('\n')+`\nMi WhatsApp: ${ph}`);
+    bust();main.innerHTML=`<div class="box"><h3>¡Solicitud enviada!</h3><p class="hello">${acct()?'Cuando las aprobemos, las vas a ver en "Mis entradas" y también te las mandamos por WhatsApp.':'Te mandamos las entradas por WhatsApp a ese número apenas las aprobemos.'} Abrimos WhatsApp para que nos avises.</p><a class="bt pri big" href="${w}">Abrir WhatsApp</a></div>`;setTimeout(()=>location.href=w,1800)}}
 
 /* ---------- mis entradas (historial por evento) ---------- */
 async function mine(){
@@ -254,13 +269,13 @@ async function mine(){
     <div class="songrow">${svg('note')}${(r.song_url||r.song_title)?(yt(r.song_url)?`<a class="song" href="${esc(r.song_url)}" target="_blank" rel="noopener"><span>${esc(r.song_title||'Canción de YouTube')}</span></a>`:`<span class="song"><span>${esc(r.song_title)}</span></span>`):'<span class="song mu"><span>Sin canción todavía</span></span>'}<button class="sm" data-tg="${r.id}">${(r.song_url||r.song_title)?'Cambiar':'Agregar'}</button></div>
     <div class="songedit" data-ed2="${r.id}"><input data-su="${r.id}" value="${esc(r.song_url||'')}" placeholder="Pegá el enlace de YouTube de tu canción"><div class="r"><button class="sm pri" data-sv="${r.id}">Guardar canción</button></div><p class="sm" data-sm="${r.id}"></p></div></div>`};
   const title=g=>g.e?`<div class="sec"><h2>Entradas para ${esc(g.e.name)}</h2><span class="cnt plain">${esc(fshort(g.e.d))} · ${ftime(g.e.d)}</span>${g.e.d.getTime()<Date.now()-12*36e5?'<span class="chip wait">Finalizado</span>':''}</div>`:'<div class="sec"><h2>Entradas anteriores</h2></div>';
-  main.innerHTML=`<div class="sec" style="margin-top:6px"><h2>Mis entradas</h2><button id="rf" class="sm" style="margin-left:auto">↻ Actualizar</button></div>`+(groups.map(g=>title(g)+g.rs.map(r=>box(r,g.e)).join('')).join('')||'<div class="empty">Todavía no pediste entradas.<b>Cuando las pidas, van a aparecer acá.</b></div>');
+  main.innerHTML=(user.is_anonymous?'<div class="note">Pediste sin cuenta: estas entradas se guardan solo en este dispositivo, pero igual te las mandamos por WhatsApp. <a class="lk" data-reg="1">Crear cuenta</a></div>':'')+`<div class="sec" style="margin-top:6px"><h2>Mis entradas</h2><button id="rf" class="sm" style="margin-left:auto">↻ Actualizar</button></div>`+(groups.map(g=>title(g)+g.rs.map(r=>box(r,g.e)).join('')).join('')||'<div class="empty">Todavía no pediste entradas.<b>Cuando las pidas, van a aparecer acá.</b></div>');
   document.querySelectorAll('[data-q]').forEach(async i=>{
     try{
       if(typeof QRCode==='undefined'||typeof QRCode.toDataURL!=='function')throw new Error('la librería de QR no cargó (typeof QRCode = '+typeof QRCode+')');
       const u=await QRCode.toDataURL(i.dataset.q,{width:600,margin:3});qrUrls[i.dataset.q]=u;i.src=u}
     catch(e){console.error('QR',e);const s=document.createElement('span');s.className='bad';s.textContent='No se pudo generar el QR: '+((e&&e.message)||e);i.replaceWith(s)}});
-  main.onclick=e=>{const b=e.target.closest('button');if(!b)return;
+  main.onclick=e=>{if(e.target.closest('[data-reg]'))return authView('signup');const b=e.target.closest('button');if(!b)return;
     if(tkClick(b)){}else if(b.dataset.sv)saveSong(b.dataset.sv);else if(b.dataset.tg){const w=document.querySelector(`[data-ed2="${b.dataset.tg}"]`);w.classList.toggle('open');if(w.classList.contains('open'))w.querySelector('input').focus()}else if(b.id=='rf')mine()}}
 async function saveSong(id){
   const inp=document.querySelector(`[data-su="${id}"]`),m=document.querySelector(`[data-sm="${id}"]`),b=document.querySelector(`[data-sv="${id}"]`),
@@ -274,6 +289,9 @@ async function saveSong(id){
   await mine();const m2=document.querySelector(`[data-sm="${id}"]`);if(m2){m2.className='sm ok';m2.textContent='✔ Canción actualizada: '+title;m2.closest('.songedit').classList.add('open')}}
 /* ---------- entradas como imagen: QR + nombre + evento + fecha ---------- */
 const TKR={},RQR={},TKB={};
+const waNum=s=>{let d=String(s||'').replace(/\D/g,'');if(!d)return'';if(d.startsWith('00'))d=d.slice(2);if(d.startsWith('549'))return d;if(d.startsWith('54'))return '549'+d.slice(2).replace(/^9/,'');d=d.replace(/^0/,'');if(d.length===12&&/^\d{2,4}15\d{6,8}$/.test(d))d=d.replace(/^(\d{2,4})15/,'$1');return d.length===10?'549'+d:d};
+const waRow=(r,e)=>{if(!r.contact)return'';const n=waNum(r.contact),nm=r.profiles?.display_name||'',txt=`¡Hola ${nm}! Acá están tus entradas para ${e&&e.name?e.name:'La Previa'}${e&&e.d?' del '+fshort(e.d)+' a las '+ftime(e.d):''}. Presentá el QR en la puerta. ¡Nos vemos!`;
+  return `<div class="wa">${svg('phone')}<span>${esc(r.contact)}</span>${n?`<a class="bt sm" href="https://wa.me/${n}?text=${encodeURIComponent(txt)}" target="_blank" rel="noopener">${svg('chat')}Abrir WhatsApp</a>`:''}</div>`};
 const FF='Inter,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif';
 const CAN=(()=>{try{return !!(navigator.canShare&&navigator.canShare({files:[new File(['x'],'a.png',{type:'image/png'})]}))}catch(e){return false}})();
 const capF=s=>s.charAt(0).toUpperCase()+s.slice(1);
@@ -339,9 +357,9 @@ async function admin(){
   const sold=[...AEV,{id:null,name:'Sin evento'}].map(e=>{const ap=data.filter(r=>r.status=='approved'&&(r.event_id||null)==(e.id||null));if(!ap.length)return'';
     const tk=ap.flatMap(r=>r.tickets),ing=tk.filter(t=>t.checked_in).length;
     return `<div class="grp">Entradas vendidas · ${esc(e.name)}${e.d?' '+fshort(e.d):''}<span class="cnt">${ing}/${tk.length} ingresaron</span></div>`+ap.map(r=>{const codes=regTk(r,e.d?e:null);
-      return `<div class="box" id="rq-${r.id}"><div class="reqh"><b>${esc(r.profiles?.display_name)}</b><small>${r.tickets.length} entrada${r.tickets.length>1?'s':''}</small>${reqBtns(r,codes,true)}${CAN&&codes.length===1?`<button class="sm" data-sha="${r.id}">${svg('share')}Compartir</button>`:''}</div>${r.tickets.map(t=>`<div class="ct"><input type="checkbox" disabled ${t.checked_in?'checked':''}><span>${esc(t.holder_name)}</span>${t.qr_code?`<button class="ed sm" data-dl="${esc(t.qr_code)}">${svg('download')}Descargar</button>`:''}</div>`).join('')}</div>`}).join('')}).join('');
+      return `<div class="box" id="rq-${r.id}"><div class="reqh"><b>${esc(r.profiles?.display_name)}</b><small>${r.tickets.length} entrada${r.tickets.length>1?'s':''}</small>${reqBtns(r,codes,true)}${CAN&&codes.length===1?`<button class="sm" data-sha="${r.id}">${svg('share')}Compartir</button>`:''}</div>${waRow(r,e.d?e:null)}${r.tickets.map(t=>`<div class="ct"><input type="checkbox" disabled ${t.checked_in?'checked':''}><span>${esc(t.holder_name)}</span>${t.qr_code?`<button class="ed sm" data-dl="${esc(t.qr_code)}">${svg('download')}Descargar</button>`:''}</div>`).join('')}</div>`}).join('')}).join('');
   const cur=AEV.find(e=>e.id==editId);if(!cur)editId=null;
-  main.innerHTML=`<div class="box"><button id="sc" class="pri">📷 Escanear entrada</button><div id="rd"></div><div id="res"></div></div>`+`<div class="grp">Pendientes ( ${pe.length} )</div>`+(pe.length?'':'<div class="empty">No hay solicitudes pendientes.</div>')+pe.map(r=>`<div class="box"><b>${esc(r.profiles?.display_name)}</b> · ${r.quantity} entrada(s) · <small>${evName(r.event_id)}</small><br>${r.tickets.map(t=>esc(t.holder_name)).join(', ')}<br>${r.song_title?'♪ '+esc(r.song_title):'<small>Sin canción</small>'}<br><br><button data-id="${r.id}" data-st="approved" class="pri sm">Aprobar</button> <button data-id="${r.id}" data-st="rejected" class="sm danger">Rechazar</button></div>`).join('')+sold+`  <div class="box" id="evf"><b>${cur?'✏️ Editar evento':'➕ Crear evento'}</b><label>Nombre</label><input id="en" value="${esc(cur?cur.name:'La Previa')}" maxlength="60"><label>Fecha y hora</label><input id="ed" type="datetime-local" value="${cur?loc(cur.d):''}"><label>Dirección</label><input id="ea" maxlength="120" placeholder="Calle y número, ciudad" value="${esc(cur?cur.address||'':'')}"><label>Cantidad de entradas a la venta</label><input id="ec" type="number" min="1" inputmode="numeric" placeholder="Ej: 150" value="${cur?cur.capacity:''}"><button id="ecb" class="pri">${cur?'Guardar cambios':'Crear evento'}</button>${cur?' <button id="ecc" class="sm">Cancelar</button>':''}<p id="eer" class="bad"></p></div>
+  main.innerHTML=`<div class="box"><button id="sc" class="pri">📷 Escanear entrada</button><div id="rd"></div><div id="res"></div></div>`+`<div class="grp">Pendientes ( ${pe.length} )</div>`+(pe.length?'':'<div class="empty">No hay solicitudes pendientes.</div>')+pe.map(r=>`<div class="box"><b>${esc(r.profiles?.display_name)}</b> · ${r.quantity} entrada(s) · <small>${evName(r.event_id)}</small><br>${r.tickets.map(t=>esc(t.holder_name)).join(', ')}${r.contact?`<br>WhatsApp: ${esc(r.contact)}`:''}<br>${r.song_title?'♪ '+esc(r.song_title):'<small>Sin canción</small>'}<br><br><button data-id="${r.id}" data-st="approved" class="pri sm">Aprobar</button> <button data-id="${r.id}" data-st="rejected" class="sm danger">Rechazar</button></div>`).join('')+sold+`  <div class="box" id="evf"><b>${cur?'✏️ Editar evento':'➕ Crear evento'}</b><label>Nombre</label><input id="en" value="${esc(cur?cur.name:'La Previa')}" maxlength="60"><label>Fecha y hora</label><input id="ed" type="datetime-local" value="${cur?loc(cur.d):''}"><label>Dirección</label><input id="ea" maxlength="120" placeholder="Calle y número, ciudad" value="${esc(cur?cur.address||'':'')}"><label>Cantidad de entradas a la venta</label><input id="ec" type="number" min="1" inputmode="numeric" placeholder="Ej: 150" value="${cur?cur.capacity:''}"><button id="ecb" class="pri">${cur?'Guardar cambios':'Crear evento'}</button>${cur?' <button id="ecc" class="sm">Cancelar</button>':''}<p id="eer" class="bad"></p></div>
   <div class="grp">Eventos</div>${ev.error?`<p class="bad ct">Falta ejecutar eventos.sql en Supabase (${esc(ev.error.message)})</p>`:AEV.map(stat).join('')||'<p class="ct">Todavía no creaste ningún evento.</p>'}
   <div class="box"><b>🎶 Rocola</b><p class="sm">Pegá uno o varios enlaces de YouTube (uno por línea). Suenan al azar junto con las canciones que eligen los invitados con entrada aprobada.</p><textarea id="jl" rows="3" placeholder="https://www.youtube.com/watch?v=..."></textarea><button id="jla" class="pri">Agregar a la rocola</button><p id="jer" class="bad"></p>${jk.error?`<p class="bad">Falta ejecutar rocola.sql en Supabase (${esc(jk.error.message)})</p>`:(jk.data||[]).map(x=>`<div class="ct"><span>♪ ${esc(x.title)}</span><button class="ed sm" data-jd="${x.id}">✕</button></div>`).join('')||'<p class="sm">Todavía no agregaste canciones.</p>'}</div>`;
   main.onclick=async e=>{

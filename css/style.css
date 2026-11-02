@@ -319,3 +319,5 @@ body{background:radial-gradient(560px 340px at 6% -4%,rgba(255,110,168,.22),tran
  #mb a[data-v=form].on svg{color:#17121f}
 }
 @media(min-width:1000px){#mb a.on{box-shadow:inset 0 -2px 0 var(--pk)}#mb a[data-v=form] svg{width:19px;height:19px;padding:0;margin:0;background:none;color:inherit;box-shadow:none}}
+.wa{display:flex;align-items:center;gap:10px;margin:2px 0 10px;padding:10px 12px;border-radius:12px;background:var(--s1);color:var(--t2)}
+.wa svg{color:var(--pk)}.wa span{min-width:0;overflow:hidden;text-overflow:ellipsis}.wa .bt{margin-left:auto;flex:none}
