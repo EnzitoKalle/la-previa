@@ -6,7 +6,6 @@ const getTitle=async u=>{
     const c=new AbortController(),t=setTimeout(()=>c.abort(),6000);
     try{const r=await(await fetch(f+encodeURIComponent(u),{signal:c.signal})).json();if(r&&r.title&&!r.error)return String(r.title).slice(0,150)}catch(e){}finally{clearTimeout(t)}
   }return''};
-const dataFile=(u,n)=>{const b=atob(u.split(',')[1]),a=new Uint8Array(b.length);for(let i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return new File([a],n,{type:'image/png'})};
 const qrUrls={};
 const loadScript=u=>new Promise((ok,no)=>{const s=document.createElement('script');s.src=u;s.onload=ok;s.onerror=no;document.head.appendChild(s)});
 const idle=f=>{const go=()=>('requestIdleCallback' in window?requestIdleCallback(f,{timeout:4000}):setTimeout(f,2500));if(document.readyState==='complete')setTimeout(go,1200);else addEventListener('load',()=>setTimeout(go,1200),{once:true})};
@@ -29,10 +28,11 @@ const ICO={
  phone:'<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/>',
  ig:'<rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor"/>',
  chev:'<path d="m9 6 6 6-6 6"/>',
+ download:'<path d="M12 4v11M8 11l4 4 4-4"/><path d="M5 19h14"/>',
  share:'<path d="M12 15V4M8 8l4-4 4 4"/><path d="M5 12v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/>'};
 const svg=(n,c='')=>`<svg class="ic ${c}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[n]||''}</svg>`;
 const GLOGO='<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>';
-const avc=n=>{let h=0;for(const c of String(n))h=(h*31+c.charCodeAt(0))%360;return `background:hsl(${h} 32% 38%)`};
+const avc=n=>{let h=0;for(const c of String(n))h=(h*31+c.charCodeAt(0))%360;return `background:linear-gradient(135deg,hsl(${h} 85% 74%),hsl(${(h+45)%360} 80% 64%));color:#1a1426`};
 const skel='<div class="sk h"></div><div class="sk"></div><div class="sk"></div>';
 let user=null,view='home',ready=0,last=null,selEv=null,afterV=null,EV=[],AEV=[];
 const isAdmin=()=>user&&user.email===C.ADMIN_EMAIL;
@@ -99,9 +99,9 @@ let cdT=0;
 function tickCd(){
   const e=feat(),el=$('#cd');if(!e||!el)return;
   const s=Math.floor((e.d.getTime()-Date.now())/1000);
-  if(s<=0){el.textContent='¡La fiesta ya empezó!';return}
-  const d=Math.floor(s/86400),p=n=>String(n).padStart(2,'0');
-  el.textContent=`Faltan ${d?d+(d==1?' día · ':' días · '):''}${p(Math.floor(s%86400/3600))}:${p(Math.floor(s%3600/60))}:${p(s%60)}`}
+  if(s<=0){if(!el.querySelector('.now'))el.innerHTML='<div class="now"><i class="live"></i>¡La fiesta ya empezó!</div>';return}
+  const v=[Math.floor(s/86400),Math.floor(s%86400/3600),Math.floor(s%3600/60),s%60];
+  el.querySelectorAll('b').forEach((x,i)=>{const t=String(v[i]).padStart(2,'0');if(x.textContent!==t)x.textContent=t})}
 function strip(){
   const e=feat(),el=$('#strip');if(!el||!e)return;
   const c=LST[e.id];if(!c||c.p){el.hidden=true;return}
@@ -114,9 +114,9 @@ function updateCta(){
   const tag=C.STATUS_MSG?`<p class="tag">${esc(C.STATUS_MSG)}</p>`:'';
   if(!e){b.innerHTML=`<div class="hero">${tag}<h1 class="evn2">Estamos preparando la próxima fecha</h1><p class="sub">Volvé pronto: apenas se confirme, vas a poder pedir tu entrada desde acá.</p></div>`;return}
   b.innerHTML=`<div class="hero">${tag}<h1 class="evn2">${esc(e.name)}</h1>
-   <p class="meta">${esc(fdate(e.d))} · ${ftime(e.d)}</p>
+   <div class="when"><div class="cal"><span>${e.d.toLocaleDateString('es-AR',{month:'short'}).replace('.','').toUpperCase()}</span><b>${e.d.getDate()}</b></div><div class="wh"><span class="wd">${esc(capF(e.d.toLocaleDateString('es-AR',{weekday:'long'})))}</span><span class="hr">${svg('clock')}${ftime(e.d)}</span></div></div>
    ${e.address?`<a class="where" href="${mapLink(e.address)}" target="_blank" rel="noopener">${svg('pin')}<span>${esc(e.address)}</span></a>`:''}
-   <p class="cdl" id="cd"></p>
+   <div class="cd" id="cd"><div><b>00</b><small>días</small></div><div><b>00</b><small>horas</small></div><div><b>00</b><small>min</small></div><div><b>00</b><small>seg</small></div></div>
    ${evPill(e)}${e.sold_out?'':`<button id="cta" class="pri big" data-ev="${e.id}"><span>Quiero una entrada</span></button>`}
    <button class="strip" id="strip" hidden></button></div>`;
   cdT=setInterval(tickCd,1000);tickCd();strip()}
@@ -249,10 +249,10 @@ async function mine(){
   const chip=s=>({pending:'<span class="chip wait">Solicitada</span>',approved:'<span class="chip ok">Aprobada</span>',rejected:'<span class="chip no">Rechazada</span>'}[s]||esc(s));
   const stub=(r,t,e)=>r.status!='approved'?`<div class="row">${svg('ticket')}<span>${esc(t.holder_name)}</span></div>`
     :!t.qr_code?`<div class="row"><span>${esc(t.holder_name)}</span><small class="bad">QR no disponible, avisá al organizador</small></div>`
-    :`<div class="stub${t.checked_in?' used':''}"><div class="sl"><small>${e?esc(e.name):'La Previa'}</small><b>${esc(t.holder_name)}</b><span class="sd">${e?`${esc(fshort(e.d))} · ${ftime(e.d)}`:''}</span><button class="sm" data-s="${esc(t.qr_code)}" data-n="${esc(t.holder_name)}">${svg('share')}Compartir</button></div><div class="perf"></div><div class="sr"><img data-q="${esc(t.qr_code)}" alt="Código QR de ${esc(t.holder_name)}"><span class="stat">${t.checked_in?'Ya ingresó':'Entrada válida'}</span></div></div>`;
-  const box=(r,e)=>`<div class="req"><div class="reqh">${chip(r.status)}<small>${r.quantity} entrada${r.quantity>1?'s':''}</small></div>${(r.tickets||[]).map(t=>stub(r,t,e)).join('')}
+    :`<div class="stub${t.checked_in?' used':''}"><div class="sl"><small>${e?esc(e.name):'La Previa'}</small><b>${esc(t.holder_name)}</b><span class="sd">${e?`${esc(fshort(e.d))} · ${ftime(e.d)}`:''}</span><div class="tkb">${tkBtns(t.qr_code)}</div></div><div class="perf"></div><div class="sr"><img data-q="${esc(t.qr_code)}" alt="Código QR de ${esc(t.holder_name)}"><span class="stat">${t.checked_in?'Ya ingresó':'Entrada válida'}</span></div></div>`;
+  const box=(r,e)=>{const codes=r.status=='approved'?regTk(r,e):[];return `<div class="req"><div class="reqh">${chip(r.status)}<small>${r.quantity} entrada${r.quantity>1?'s':''}</small>${reqBtns(r,codes,true)}</div>${(r.tickets||[]).map(t=>stub(r,t,e)).join('')}
     <div class="songrow">${svg('note')}${(r.song_url||r.song_title)?(yt(r.song_url)?`<a class="song" href="${esc(r.song_url)}" target="_blank" rel="noopener"><span>${esc(r.song_title||'Canción de YouTube')}</span></a>`:`<span class="song"><span>${esc(r.song_title)}</span></span>`):'<span class="song mu"><span>Sin canción todavía</span></span>'}<button class="sm" data-tg="${r.id}">${(r.song_url||r.song_title)?'Cambiar':'Agregar'}</button></div>
-    <div class="songedit" data-ed2="${r.id}"><input data-su="${r.id}" value="${esc(r.song_url||'')}" placeholder="Pegá el enlace de YouTube de tu canción"><div class="r"><button class="sm pri" data-sv="${r.id}">Guardar canción</button></div><p class="sm" data-sm="${r.id}"></p></div></div>`;
+    <div class="songedit" data-ed2="${r.id}"><input data-su="${r.id}" value="${esc(r.song_url||'')}" placeholder="Pegá el enlace de YouTube de tu canción"><div class="r"><button class="sm pri" data-sv="${r.id}">Guardar canción</button></div><p class="sm" data-sm="${r.id}"></p></div></div>`};
   const title=g=>g.e?`<div class="sec"><h2>Entradas para ${esc(g.e.name)}</h2><span class="cnt plain">${esc(fshort(g.e.d))} · ${ftime(g.e.d)}</span>${g.e.d.getTime()<Date.now()-12*36e5?'<span class="chip wait">Finalizado</span>':''}</div>`:'<div class="sec"><h2>Entradas anteriores</h2></div>';
   main.innerHTML=`<div class="sec" style="margin-top:6px"><h2>Mis entradas</h2><button id="rf" class="sm" style="margin-left:auto">↻ Actualizar</button></div>`+(groups.map(g=>title(g)+g.rs.map(r=>box(r,g.e)).join('')).join('')||'<div class="empty">Todavía no pediste entradas.<b>Cuando las pidas, van a aparecer acá.</b></div>');
   document.querySelectorAll('[data-q]').forEach(async i=>{
@@ -261,7 +261,7 @@ async function mine(){
       const u=await QRCode.toDataURL(i.dataset.q,{width:600,margin:3});qrUrls[i.dataset.q]=u;i.src=u}
     catch(e){console.error('QR',e);const s=document.createElement('span');s.className='bad';s.textContent='No se pudo generar el QR: '+((e&&e.message)||e);i.replaceWith(s)}});
   main.onclick=e=>{const b=e.target.closest('button');if(!b)return;
-    if(b.dataset.s)share(b.dataset.s,b.dataset.n);else if(b.dataset.sv)saveSong(b.dataset.sv);else if(b.dataset.tg){const w=document.querySelector(`[data-ed2="${b.dataset.tg}"]`);w.classList.toggle('open');if(w.classList.contains('open'))w.querySelector('input').focus()}else if(b.id=='rf')mine()}}
+    if(tkClick(b)){}else if(b.dataset.sv)saveSong(b.dataset.sv);else if(b.dataset.tg){const w=document.querySelector(`[data-ed2="${b.dataset.tg}"]`);w.classList.toggle('open');if(w.classList.contains('open'))w.querySelector('input').focus()}else if(b.id=='rf')mine()}}
 async function saveSong(id){
   const inp=document.querySelector(`[data-su="${id}"]`),m=document.querySelector(`[data-sm="${id}"]`),b=document.querySelector(`[data-sv="${id}"]`),
     say=(c,t)=>{m.className='sm '+c;m.textContent=t},url=inp.value.trim();
@@ -272,12 +272,60 @@ async function saveSong(id){
   const{error}=await sb.rpc('update_my_song',{p_request_id:String(id),p_url:url,p_title:title});
   if(error){console.error(error);b.disabled=false;return say('bad','No se pudo guardar. Probá de nuevo.')}
   await mine();const m2=document.querySelector(`[data-sm="${id}"]`);if(m2){m2.className='sm ok';m2.textContent='✔ Canción actualizada: '+title;m2.closest('.songedit').classList.add('open')}}
-function share(code,name){
-  const u=qrUrls[code];if(!u)return alert('El QR todavía se está generando. Probá de nuevo en un segundo.');
-  const f=dataFile(u,'entrada-'+name.replace(/[^\w-]+/g,'_')+'.png'),txt='Mi entrada para La Previa - '+name;
-  const alt=()=>{const a=document.createElement('a');a.href=u;a.download=f.name;a.click();window.open('https://wa.me/?text='+encodeURIComponent(txt+' (te adjunto el QR)'),'_blank')};
-  if(navigator.canShare&&navigator.canShare({files:[f]}))navigator.share({files:[f],title:'Entrada La Previa',text:txt}).catch(e=>{if(e.name!='AbortError')alt()});
-  else alt()}
+/* ---------- entradas como imagen: QR + nombre + evento + fecha ---------- */
+const TKR={},RQR={},TKB={};
+const FF='Inter,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif';
+const CAN=(()=>{try{return !!(navigator.canShare&&navigator.canShare({files:[new File(['x'],'a.png',{type:'image/png'})]}))}catch(e){return false}})();
+const capF=s=>s.charAt(0).toUpperCase()+s.slice(1);
+const tkName=c=>{const r=TKR[c];return ('Entrada '+(r.e?r.e.name+' - ':'')+r.t.holder_name).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^\x20-\x7E]|[\\/:*?"<>|]/g,'').replace(/\s+/g,' ').trim()+'.png'};
+const fitText=(x,txt,max,px,wt)=>{let s=px;for(;s>26;s-=2){x.font=`${wt} ${s}px ${FF}`;if(x.measureText(txt).width<=max)break}x.font=`${wt} ${s}px ${FF}`;return s};
+const ellip=(x,txt,max)=>{if(x.measureText(txt).width<=max)return txt;while(txt.length>1&&x.measureText(txt+'…').width>max)txt=txt.slice(0,-1);return txt+'…'};
+function regTk(r,e){const codes=[];(r.tickets||[]).forEach((t,k)=>{if(t.qr_code){TKR[t.qr_code]={t,e,i:k+1,n:r.tickets.length};codes.push(t.qr_code)}});RQR[r.id]=codes;return codes}
+async function ticketBlob(code){
+  if(TKB[code])return TKB[code];
+  const{t,e,i,n}=TKR[code];
+  try{await Promise.all([document.fonts.load('800 80px Inter'),document.fonts.load('600 40px Inter'),document.fonts.load('500 30px Inter')])}catch(_){}
+  const W=1080,H=1700,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
+  x.fillStyle='#0c0c10';x.fillRect(0,0,W,H);
+  const glow=(cx,cy,r,a,b)=>{const g=x.createRadialGradient(cx,cy,0,cx,cy,r);g.addColorStop(0,a);g.addColorStop(1,b);x.fillStyle=g;x.fillRect(0,0,W,H)};
+  glow(120,60,720,'rgba(255,110,168,.42)','rgba(255,110,168,0)');glow(W-80,150,780,'rgba(139,125,255,.5)','rgba(139,125,255,0)');glow(W/2,H+40,840,'rgba(95,200,245,.28)','rgba(95,200,245,0)');
+  const L=48,R=W-48,T=48,B=H-48,r=58,py=640,nr=36;
+  const card=()=>{x.beginPath();x.moveTo(L+r,T);x.lineTo(R-r,T);x.arcTo(R,T,R,T+r,r);x.lineTo(R,py-nr);x.arc(R,py,nr,-Math.PI/2,Math.PI/2,true);x.lineTo(R,B-r);x.arcTo(R,B,R-r,B,r);x.lineTo(L+r,B);x.arcTo(L,B,L,B-r,r);x.lineTo(L,py+nr);x.arc(L,py,nr,Math.PI/2,-Math.PI/2,true);x.lineTo(L,T+r);x.arcTo(L,T,L+r,T,r);x.closePath()};
+  card();x.fillStyle='#16141f';x.fill();
+  x.save();card();x.clip();let g=x.createLinearGradient(0,T,0,py);g.addColorStop(0,'rgba(255,126,176,.24)');g.addColorStop(1,'rgba(139,125,255,.10)');x.fillStyle=g;x.fillRect(L,T,R-L,py-T);x.restore();
+  card();g=x.createLinearGradient(L,T,R,B);g.addColorStop(0,'rgba(255,143,184,.95)');g.addColorStop(.5,'rgba(179,165,255,.75)');g.addColorStop(1,'rgba(130,196,255,.85)');x.lineWidth=4;x.strokeStyle=g;x.stroke();
+  x.textAlign='left';x.textBaseline='alphabetic';
+  if('letterSpacing' in x)x.letterSpacing='9px';x.font=`600 30px ${FF}`;x.fillStyle='#d4ccff';x.fillText('LA PREVIA',100,148);if('letterSpacing' in x)x.letterSpacing='0px';
+  const name=e?e.name:'La Previa';fitText(x,name,880,112,800);
+  g=x.createLinearGradient(100,0,980,0);g.addColorStop(0,'#ffffff');g.addColorStop(.55,'#ffd9ea');g.addColorStop(1,'#d4ccff');x.fillStyle=g;x.fillText(name,100,272);
+  if(e&&e.d){x.font=`600 50px ${FF}`;x.fillStyle='#ffffff';x.fillText(capF(e.d.toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'}).replace(',','')),100,370);
+    x.font=`600 46px ${FF}`;x.fillStyle='#ffb3d1';x.fillText(ftime(e.d),100,434);
+    if(e.address){x.font=`500 34px ${FF}`;x.fillStyle='#bdb8d8';x.fillText(ellip(x,e.address,880),100,500)}}
+  x.setLineDash([16,14]);x.strokeStyle='rgba(255,255,255,.3)';x.lineWidth=3;x.beginPath();x.moveTo(L+nr+24,py);x.lineTo(R-nr-24,py);x.stroke();x.setLineDash([]);
+  const qs=640,qx=(W-qs)/2,qy=724;
+  x.save();x.shadowColor='rgba(139,125,255,.6)';x.shadowBlur=60;x.beginPath();x.moveTo(qx+44,qy);x.arcTo(qx+qs,qy,qx+qs,qy+qs,44);x.arcTo(qx+qs,qy+qs,qx,qy+qs,44);x.arcTo(qx,qy+qs,qx,qy,44);x.arcTo(qx,qy,qx+qs,qy,44);x.closePath();x.fillStyle='#fff';x.fill();x.restore();
+  const im=new Image();im.src=await QRCode.toDataURL(code,{width:1100,margin:2});await im.decode();x.imageSmoothingQuality='high';x.drawImage(im,qx+30,qy+30,qs-60,qs-60);
+  x.textAlign='center';
+  const hn=t.holder_name||'';fitText(x,hn,860,78,800);x.fillStyle='#ffffff';x.fillText(hn,W/2,1478);
+  x.font=`500 38px ${FF}`;x.fillStyle='#d4ccff';x.fillText(n>1?`Entrada ${i} de ${n}`:'Entrada personal',W/2,1542);
+  x.font=`400 28px ${FF}`;x.fillStyle='#9a95b4';x.fillText('Presentá este código en la puerta · Válida una sola vez',W/2,1604);
+  return TKB[code]=await new Promise(res=>c.toBlob(res,'image/png'))}
+async function dlTicket(code){const b=await ticketBlob(code),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=tkName(code);document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),6000)}
+async function dlMany(codes){for(const c of codes){await dlTicket(c);await new Promise(r=>setTimeout(r,500))}}
+async function shareTickets(codes){
+  const files=await Promise.all(codes.map(async c=>new File([await ticketBlob(c)],tkName(c),{type:'image/png'})));
+  if(navigator.canShare&&navigator.canShare({files})){try{await navigator.share({files,title:'Entradas'});return}catch(e){if(e&&e.name==='AbortError')return}}
+  await dlMany(codes)}
+async function busy(b,f){const h=b.innerHTML;b.disabled=true;b.textContent='Preparando…';try{await f()}catch(e){console.error(e);alert('No se pudo generar la imagen. Probá de nuevo.')}b.innerHTML=h;b.disabled=false}
+function tkClick(b){
+  const d=b.dataset;
+  if(d.dl){busy(b,()=>dlTicket(d.dl));return true}
+  if(d.sh){busy(b,()=>shareTickets([d.sh]));return true}
+  if(d.dla){busy(b,()=>dlMany(RQR[d.dla]||[]));return true}
+  if(d.sha){busy(b,()=>shareTickets(RQR[d.sha]||[]));return true}
+  return false}
+const tkBtns=code=>`<button class="sm" data-dl="${esc(code)}">${svg('download')}Descargar</button>${CAN?`<button class="sm" data-sh="${esc(code)}">${svg('share')}Compartir</button>`:''}`;
+const reqBtns=(r,codes,pri)=>(codes.length>1?`<button class="sm${pri?' pri':''}" data-dla="${r.id}">${svg('download')}Descargar todas</button>`:'')+(CAN&&codes.length>1?`<button class="sm" data-sha="${r.id}">${svg('share')}Compartir todas</button>`:'');
 let editId=null;
 const loc=d=>{const p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`};
 async function admin(){
@@ -290,18 +338,21 @@ async function admin(){
   const pe=data.filter(r=>r.status=='pending');
   const sold=[...AEV,{id:null,name:'Sin evento'}].map(e=>{const ap=data.filter(r=>r.status=='approved'&&(r.event_id||null)==(e.id||null));if(!ap.length)return'';
     const tk=ap.flatMap(r=>r.tickets),ing=tk.filter(t=>t.checked_in).length;
-    return `<div class="grp">${esc(e.name)}${e.d?' '+fshort(e.d):''} — vendidas ( ${ing} / ${tk.length} ingresaron )</div>`+ap.map(r=>r.tickets.map(t=>`<div class="ct"><input type="checkbox" disabled ${t.checked_in?'checked':''}> ${esc(t.holder_name)} <small>(${esc(r.profiles?.display_name)})</small></div>`).join('')).join('')}).join('');
+    return `<div class="grp">Entradas vendidas · ${esc(e.name)}${e.d?' '+fshort(e.d):''}<span class="cnt">${ing}/${tk.length} ingresaron</span></div>`+ap.map(r=>{const codes=regTk(r,e.d?e:null);
+      return `<div class="box" id="rq-${r.id}"><div class="reqh"><b>${esc(r.profiles?.display_name)}</b><small>${r.tickets.length} entrada${r.tickets.length>1?'s':''}</small>${reqBtns(r,codes,true)}${CAN&&codes.length===1?`<button class="sm" data-sha="${r.id}">${svg('share')}Compartir</button>`:''}</div>${r.tickets.map(t=>`<div class="ct"><input type="checkbox" disabled ${t.checked_in?'checked':''}><span>${esc(t.holder_name)}</span>${t.qr_code?`<button class="ed sm" data-dl="${esc(t.qr_code)}">${svg('download')}Descargar</button>`:''}</div>`).join('')}</div>`}).join('')}).join('');
   const cur=AEV.find(e=>e.id==editId);if(!cur)editId=null;
-  main.innerHTML=`<div class="box"><button id="sc" class="pri">📷 Escanear entrada</button><div id="rd"></div><div id="res"></div></div>`+`<div class="grp">Pendientes ( ${pe.length} )</div>`+(pe.length?'':'<div class="empty">No hay solicitudes pendientes.</div>')+pe.map(r=>`<div class="box"><b>${esc(r.profiles?.display_name)}</b> · ${r.quantity} entrada(s) · <small>${evName(r.event_id)}</small><br>${r.tickets.map(t=>esc(t.holder_name)).join(', ')}<br>${r.song_title?'♪ '+esc(r.song_title):'<small>Sin canción</small>'}<br><br><button data-id="${r.id}" data-st="approved" class="pri sm">Aprobar</button> <button data-id="${r.id}" data-st="rejected" class="sm danger">Rechazar</button></div>`).join('')+`  <div class="box" id="evf"><b>${cur?'✏️ Editar evento':'➕ Crear evento'}</b><label>Nombre</label><input id="en" value="${esc(cur?cur.name:'La Previa')}" maxlength="60"><label>Fecha y hora</label><input id="ed" type="datetime-local" value="${cur?loc(cur.d):''}"><label>Dirección</label><input id="ea" maxlength="120" placeholder="Calle y número, ciudad" value="${esc(cur?cur.address||'':'')}"><label>Cantidad de entradas a la venta</label><input id="ec" type="number" min="1" inputmode="numeric" placeholder="Ej: 150" value="${cur?cur.capacity:''}"><button id="ecb" class="pri">${cur?'Guardar cambios':'Crear evento'}</button>${cur?' <button id="ecc" class="sm">Cancelar</button>':''}<p id="eer" class="bad"></p></div>
+  main.innerHTML=`<div class="box"><button id="sc" class="pri">📷 Escanear entrada</button><div id="rd"></div><div id="res"></div></div>`+`<div class="grp">Pendientes ( ${pe.length} )</div>`+(pe.length?'':'<div class="empty">No hay solicitudes pendientes.</div>')+pe.map(r=>`<div class="box"><b>${esc(r.profiles?.display_name)}</b> · ${r.quantity} entrada(s) · <small>${evName(r.event_id)}</small><br>${r.tickets.map(t=>esc(t.holder_name)).join(', ')}<br>${r.song_title?'♪ '+esc(r.song_title):'<small>Sin canción</small>'}<br><br><button data-id="${r.id}" data-st="approved" class="pri sm">Aprobar</button> <button data-id="${r.id}" data-st="rejected" class="sm danger">Rechazar</button></div>`).join('')+sold+`  <div class="box" id="evf"><b>${cur?'✏️ Editar evento':'➕ Crear evento'}</b><label>Nombre</label><input id="en" value="${esc(cur?cur.name:'La Previa')}" maxlength="60"><label>Fecha y hora</label><input id="ed" type="datetime-local" value="${cur?loc(cur.d):''}"><label>Dirección</label><input id="ea" maxlength="120" placeholder="Calle y número, ciudad" value="${esc(cur?cur.address||'':'')}"><label>Cantidad de entradas a la venta</label><input id="ec" type="number" min="1" inputmode="numeric" placeholder="Ej: 150" value="${cur?cur.capacity:''}"><button id="ecb" class="pri">${cur?'Guardar cambios':'Crear evento'}</button>${cur?' <button id="ecc" class="sm">Cancelar</button>':''}<p id="eer" class="bad"></p></div>
   <div class="grp">Eventos</div>${ev.error?`<p class="bad ct">Falta ejecutar eventos.sql en Supabase (${esc(ev.error.message)})</p>`:AEV.map(stat).join('')||'<p class="ct">Todavía no creaste ningún evento.</p>'}
-  <div class="box"><b>🎶 Rocola</b><p class="sm">Pegá uno o varios enlaces de YouTube (uno por línea). Suenan al azar junto con las canciones que eligen los invitados con entrada aprobada.</p><textarea id="jl" rows="3" placeholder="https://www.youtube.com/watch?v=..."></textarea><button id="jla" class="pri">Agregar a la rocola</button><p id="jer" class="bad"></p>${jk.error?`<p class="bad">Falta ejecutar rocola.sql en Supabase (${esc(jk.error.message)})</p>`:(jk.data||[]).map(x=>`<div class="ct"><span>♪ ${esc(x.title)}</span><button class="ed sm" data-jd="${x.id}">✕</button></div>`).join('')||'<p class="sm">Todavía no agregaste canciones.</p>'}</div>`+sold;
+  <div class="box"><b>🎶 Rocola</b><p class="sm">Pegá uno o varios enlaces de YouTube (uno por línea). Suenan al azar junto con las canciones que eligen los invitados con entrada aprobada.</p><textarea id="jl" rows="3" placeholder="https://www.youtube.com/watch?v=..."></textarea><button id="jla" class="pri">Agregar a la rocola</button><p id="jer" class="bad"></p>${jk.error?`<p class="bad">Falta ejecutar rocola.sql en Supabase (${esc(jk.error.message)})</p>`:(jk.data||[]).map(x=>`<div class="ct"><span>♪ ${esc(x.title)}</span><button class="ed sm" data-jd="${x.id}">✕</button></div>`).join('')||'<p class="sm">Todavía no agregaste canciones.</p>'}</div>`;
   main.onclick=async e=>{
+    const tb=e.target.closest('button');if(tb&&tkClick(tb))return;
     const ed=e.target.closest('[data-ed]');if(ed){editId=ed.dataset.ed;await admin();$('#evf').scrollIntoView({behavior:'smooth',block:'center'});return}
     const jd=e.target.closest('[data-jd]');if(jd){jd.disabled=true;const r=await sb.from('jukebox').delete().eq('id',jd.dataset.jd);if(r.error)console.error(r.error);await loadJuke();return admin()}
     const b=e.target.closest('[data-id]');if(!b)return;b.disabled=true;
     const r=b.dataset.st=='approved'?await sb.rpc('approve_request',{p_request_id:String(b.dataset.id)}):await sb.from('requests').update({status:b.dataset.st}).eq('id',b.dataset.id);
     if(r.error){console.error(r.error);alert(/sold_out/.test(r.error.message)?'No quedan entradas suficientes en ese evento para aprobar esta solicitud.':'No se pudo actualizar. Probá de nuevo.')}
-    bust();admin();badge();loadJuke()};
+    bust();await admin();badge();loadJuke();
+    if(b.dataset.st=='approved'&&!r.error){const el=document.getElementById('rq-'+b.dataset.id);if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.classList.add('flash');setTimeout(()=>el.classList.remove('flash'),2600)}}};
   $('#ecb').onclick=async()=>{
     const n=$('#en').value.trim(),d=$('#ed').value,c=parseInt($('#ec').value,10),er=m=>$('#eer').textContent=m;
     if(!n||!d||!(c>0))return er('Completá nombre, fecha y hora, y una cantidad mayor a 0.');
@@ -377,7 +428,7 @@ function playSong(s){
         drawJuke()},
       onError:()=>{jb.fails++;if(jb.fails<jb.list.length)playSong(pick());else{jb.on=false;jb.err='No se pudieron reproducir las canciones.';drawJuke()}}}})});
   jb.timer=setTimeout(()=>{if(!jb.on){jb.err='Tocá play para empezar';drawJuke()}},5000)}
-const mkJuke=()=>`<div id="juke"><div class="jrow"><div class="vinyl"><div class="lb"></div></div><div class="jinfo"><span class="jk" id="jk"></span><b id="jt"></b><span class="jby" id="jby"></span></div><button id="jp" class="pri" aria-label="Reproducir"></button></div>
+const mkJuke=()=>`<div id="juke"><div class="jrow"><div class="vinyl"><div class="lb"></div></div><div class="jinfo"><span class="jkrow"><span class="jk" id="jk"></span><span class="eq" aria-hidden="true">${Array.from({length:5},(_,i)=>`<i style="--i:${i}"></i>`).join('')}</span></span><b id="jt"></b><span class="jby" id="jby"></span></div><button id="jp" class="pri" aria-label="Reproducir"></button></div>
   <div class="jbar"><span id="jc">0:00</span><div class="jtr" id="jtr"><div class="jf" id="jf"></div></div><span id="jd">0:00</span></div>
   <div class="jfoot"><span class="jnext" id="jn"></span><button id="jx" aria-label="Siguiente canción">${svg('next')}</button><label class="vol" title="Volumen">${svg('vol')}<input id="jv" type="range" min="0" max="100" value="${jb.vol}" aria-label="Volumen"></label></div></div>`;
 function bindJuke(){
