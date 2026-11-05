@@ -288,7 +288,7 @@ function mountPicker(root,onPick){
   const drawIn=()=>{
     if(picked){inb.innerHTML='';tg.hidden=true;return}
     tg.hidden=!SPK;tg.textContent=mode==='s'?'Prefiero pegar un link':'Prefiero buscar por nombre';
-    inb.innerHTML=mode==='s'?`<div class="srch"><input class="pq" type="search" enterkeyhint="search" autocomplete="off" maxlength="80" placeholder="Ej: De música ligera Soda Stereo"><button type="button" class="pgo" aria-label="Buscar">${svg('search')}</button></div>`
+    inb.innerHTML=mode==='s'?`<div class="srch"><input class="pq" type="search" enterkeyhint="search" autocomplete="off" maxlength="80" placeholder="Himno infaltable de la época"><button type="button" class="pgo" aria-label="Buscar">${svg('search')}</button></div>`
       :'<input class="pq" type="url" inputmode="url" autocomplete="off" placeholder="Pegá el link de YouTube">'};
   const showList=()=>{res.innerHTML=list.map((x,i)=>`<button type="button" class="rs" data-i="${i}"><img src="${esc(x.th)}" alt="" loading="lazy"><span><b>${esc(x.title)}</b><small>${esc(x.ch)}</small></span></button>`).join('')};
   const showPrev=x=>{cur=x;try{if(typeof jb!=='undefined'&&jb.on&&jb.pl)jb.pl.pauseVideo()}catch(e){}
