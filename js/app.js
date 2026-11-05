@@ -7,6 +7,7 @@ const getTitle=async u=>{
     try{const r=await(await fetch(f+encodeURIComponent(u),{signal:c.signal})).json();if(r&&r.title&&!r.error)return String(r.title).slice(0,150)}catch(e){}finally{clearTimeout(t)}
   }return''};
 const qrUrls={};
+const MN=C.NOMBRE_MUSICA||'Playlist',mn=MN.toLowerCase(),LA=C.MUSICA_GENERO==='m'?'el':'la',ALA=C.MUSICA_GENERO==='m'?'al':'a la';
 const loadScript=u=>new Promise((ok,no)=>{const s=document.createElement('script');s.src=u;s.onload=ok;s.onerror=no;document.head.appendChild(s)});
 const idle=f=>{const go=()=>('requestIdleCallback' in window?requestIdleCallback(f,{timeout:4000}):setTimeout(f,2500));if(document.readyState==='complete')setTimeout(go,1200);else addEventListener('load',()=>setTimeout(go,1200),{once:true})};
 
@@ -27,6 +28,7 @@ const ICO={
  shuffle:'<path d="M3 7h3.5c5 0 5 10 10 10H21M3 17h3.5c1.4 0 2.5-.6 3.4-1.6M14 8.4c.8-.9 1.8-1.4 3-1.4H21"/><path d="m18.5 4.5 2.5 2.5-2.5 2.5M18.5 14.5l2.5 2.5-2.5 2.5"/>',
  phone:'<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/>',
  ig:'<rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor"/>',
+ search:'<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/>',
  chev:'<path d="m9 6 6 6-6 6"/>',
  download:'<path d="M12 4v11M8 11l4 4 4-4"/><path d="M5 19h14"/>',
  share:'<path d="M12 15V4M8 8l4-4 4 4"/><path d="M5 12v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/>'};
@@ -74,6 +76,7 @@ function head(){
 $('#brand').onclick=e=>{e.preventDefault();go('home')};
 
 $('#evbox').onclick=e=>{
+  if(evActs(e))return;
   if(e.target.closest('#strip')){const t=()=>{const x=$('#conectados');if(x)x.scrollIntoView({behavior:'smooth',block:'start'})};if(view==='home'||view==='list')t();else{go('home');setTimeout(t,700)}return}
   const b=e.target.closest('#cta');if(b&&!b.disabled)want(b.dataset.ev)};
 function go(v){view=v;mark();main.onclick=null;({home:home,list:home,form:()=>want(selEv),mine:mine,admin:admin,auth:()=>authView('login'),recover:recoverView,contact:contactView}[v]||home)()}
@@ -120,7 +123,7 @@ function updateCta(){
    <div class="when"><div class="cal"><span>${e.d.toLocaleDateString('es-AR',{month:'short'}).replace('.','').toUpperCase()}</span><b>${e.d.getDate()}</b></div><div class="wh"><span class="wd">${esc(capF(e.d.toLocaleDateString('es-AR',{weekday:'long'})))}</span><span class="hr">${svg('clock')}${ftime(e.d)}</span></div></div>
    ${e.address?`<a class="where" href="${mapLink(e.address)}" target="_blank" rel="noopener">${svg('pin')}<span>${esc(e.address)}</span></a>`:''}
    <div class="cd" id="cd"><div><b>00</b><small>días</small></div><div><b>00</b><small>horas</small></div><div><b>00</b><small>min</small></div><div><b>00</b><small>seg</small></div></div>
-   ${evPill(e)}${e.sold_out?'':`<button id="cta" class="pri big" data-ev="${e.id}"><span>Quiero una entrada</span></button>`}
+   ${evPill(e)}${e.sold_out?'':`<button id="cta" class="pri big" data-ev="${e.id}"><span>Quiero una entrada</span></button>`}${actsHtml(e)}
    <button class="strip" id="strip" hidden></button></div>`;
   cdT=setInterval(tickCd,1000);tickCd();strip()}
 const evCard=e=>`<div class="box ev"><div class="evn">${esc(e.name)}</div><div class="evd">${evInfo(e)}</div>${evPill(e)}${e.sold_out?'':`<button class="pri" data-ev="${e.id}">Quiero una entrada</button>`}</div>`;
@@ -205,35 +208,24 @@ async function renderForm(ev){
   ${acct()?'':'<p class="hello">No necesitás cuenta: te mandamos las entradas por WhatsApp apenas las aprobemos.</p>'}
   <div class="evmini${showEv?'':' dup'}"><b>${esc(ev.name)}</b><div class="evd">${evInfo(ev)}</div>${evPill(ev)}</div>
   <label>Tu nombre en la lista</label><input id="dn" maxlength="30" value="${esc(p?.display_name||user?.user_metadata?.full_name||'')}">
-  <label>Cantidad de entradas</label><div class="step"><button type="button" id="qm" aria-label="Menos">−</button><b id="qv">1</b><button type="button" id="qp" aria-label="Más">+</button><small>máx. ${max}</small></div><div id="nm"></div>
+  <label>Cantidad de entradas</label><div class="step"><button type="button" id="qm" aria-label="Menos">−</button><b id="qv">1</b><button type="button" id="qp" aria-label="Más">+</button><small>máx. ${max}</small></div><div class="prices" id="pr">${[1,2,3,4].map(n=>`<span data-t="${n}"><b>${n} entrada${n>1?'s':''}</b><em>${money(priceFor(n))}</em></span>`).join('')}<span data-t="5"><b>5 o más</b><em>${money(PR5)} c/u</em></span></div>
+  <div class="total"><span>Total</span><div><b id="tot"></b><small id="each"></small></div></div><div id="nm"></div>
   <label>Tu WhatsApp<span class="opt">para enviarte las entradas</span></label><input id="ct" type="tel" inputmode="tel" autocomplete="tel" maxlength="30" placeholder="Ej: 2262 123456">
-  <label>Agregá una canción que no puede faltar<span class="opt">Opcional</span></label><p class="hint">Se suma a la rocola de la fiesta cuando aprobemos tu entrada.</p><input id="su" placeholder="Pegá el enlace de YouTube"><div id="sp" class="sp"></div><input id="st" placeholder="Nombre de la canción" maxlength="150" hidden>
+  <label>Pedile tu canción al DJ<span class="opt">Opcional</span></label><p class="hint">${SPK?'Buscala por nombre y elegí el video.':'Pegá el link de YouTube de la canción.'} Se suma ${ALA} ${esc(mn)} de la fiesta cuando aprobemos tu entrada.</p><div id="pkr"></div>
   <br><button id="go" class="pri big">Enviar solicitud</button><p id="er"></p></div>`;
   const names=()=>{const old=[...document.querySelectorAll('.nm')].map(i=>i.value);$('#nm').innerHTML=Array.from({length:qty},(_,i)=>`<input class="nm" placeholder="Nombre y apellido de la entrada ${i+1}" maxlength="40" value="${esc(old[i]||'')}">`).join('')};
-  const setQ=n=>{qty=Math.min(max,Math.max(1,n));$('#qv').textContent=qty;names()};
-  names();$('#qm').onclick=()=>setQ(qty-1);$('#qp').onclick=()=>setQ(qty+1);
-  let seq=0,tm;
-  const peek=async()=>{
-    const u=$('#su').value.trim(),n=++seq;$('#st').hidden=true;$('#st').value='';
-    if(!u){$('#sp').textContent='';return}
-    if(!yt(u)){$('#sp').textContent='Ese enlace no parece ser de YouTube.';return}
-    $('#sp').textContent='Buscando el título…';
-    const t=await getTitle(u);if(n!==seq)return;
-    if(t){$('#st').value=t;$('#sp').innerHTML=`<div class="ytp">${vidId(u)?`<img src="https://i.ytimg.com/vi/${vidId(u)}/mqdefault.jpg" alt="">`:''}<span>${esc(t)}</span></div>`}
-    else{$('#st').hidden=false;$('#sp').textContent='No pudimos leer el título. Escribilo abajo.'}
-  };
-  $('#su').oninput=()=>{clearTimeout(tm);tm=setTimeout(peek,500)};
+  const price=()=>{const t=priceFor(qty);$('#tot').textContent=money(t);$('#each').textContent=qty>1?`${money(Math.round(t/qty))} c/u`:'';document.querySelectorAll('#pr [data-t]').forEach(x=>x.classList.toggle('on',+x.dataset.t===(qty>=5?5:qty)))};
+  const setQ=n=>{qty=Math.min(max,Math.max(1,n));$('#qv').textContent=qty;names();price()};
+  names();price();$('#qm').onclick=()=>setQ(qty-1);$('#qp').onclick=()=>setQ(qty+1);
+  const pk=mountPicker($('#pkr'));
   $('#go').onclick=async()=>{
-    const dn=$('#dn').value.trim(),q=qty,ns=[...document.querySelectorAll('.nm')].map(i=>i.value.trim()),su=$('#su').value.trim(),er=m=>$('#er').textContent=m;
+    const dn=$('#dn').value.trim(),q=qty,ns=[...document.querySelectorAll('.nm')].map(i=>i.value.trim()),sel=pk.get(),su=sel?'https://www.youtube.com/watch?v='+sel.id:'',er=m=>$('#er').textContent=m;
     const ph=$('#ct').value.trim();
     if(!dn||ns.some(n=>!n))return er('Completá tu nombre y el nombre de cada entrada.');
     if(ph.replace(/\D/g,'').length<8)return er('Poné tu número de WhatsApp para poder enviarte las entradas.');
-    if(su&&!yt(su))return er('Pegá un enlace de YouTube válido, o dejá la canción vacía.');
+    if(pk.pending())return er('Elegí una canción de los resultados, o borrá lo que escribiste.');
     $('#go').disabled=true;er('');
-    let st='';
-    if(su){st=$('#st').value.trim();
-      if(!st){er('Buscando el título de la canción…');st=await getTitle(su);er('')}
-      if(!st){$('#st').hidden=false;$('#go').disabled=false;return er('No pudimos leer el título. Escribilo en el cuadro de abajo, o dejá la canción vacía.')}}
+    let st=sel?sel.title:'';
     if(!user){
       const a=await sb.auth.signInAnonymously();
       if(a.error||!a.data||!a.data.user){console.error(a.error);$('#go').disabled=false;return er(a.error?authErr(a.error):'No pudimos iniciar tu pedido. Probá de nuevo.')}
@@ -249,8 +241,8 @@ async function renderForm(ev){
       break}
     if(r.error){console.error(r.error);$('#go').disabled=false;return er('No se pudo enviar la solicitud.')}
     const t=await sb.from('tickets').insert(ns.map(n=>({request_id:r.data.id,user_id:user.id,holder_name:n})));if(t.error){$('#go').disabled=false;return er('No se pudieron guardar los nombres.')}
-    const w=`https://wa.me/${C.WHATSAPP}?text=`+encodeURIComponent(`Hola! Quiero ${q} entrada${q>1?'s':''} para ${ev.name} del ${fshort(ev.d)} a nombre de:\n`+ns.map(n=>'- '+n).join('\n')+`\nMi WhatsApp: ${ph}`);
-    bust();main.innerHTML=`<div class="box"><h3>¡Solicitud enviada!</h3><p class="hello">${acct()?'Cuando las aprobemos, las vas a ver en "Mis entradas" y también te las mandamos por WhatsApp.':'Te mandamos las entradas por WhatsApp a ese número apenas las aprobemos.'} Abrimos WhatsApp para que nos avises.</p><a class="bt pri big" href="${w}">Abrir WhatsApp</a></div>`;setTimeout(()=>location.href=w,1800)}}
+    const w=`https://wa.me/${C.WHATSAPP}?text=`+encodeURIComponent(`Hola! Quiero ${q} entrada${q>1?'s':''} para ${ev.name} del ${fshort(ev.d)} a nombre de:\n`+ns.map(n=>'- '+n).join('\n')+`\nTotal: ${money(priceFor(q))}\nMi WhatsApp: ${ph}`);
+    bust();main.innerHTML=`<div class="box"><h3>¡Solicitud enviada!</h3><p class="hello">${acct()?'Cuando las aprobemos, las vas a ver en "Mis entradas" y también te las mandamos por WhatsApp.':'Te mandamos las entradas por WhatsApp a ese número apenas las aprobemos.'} Abrimos WhatsApp para que nos avises.</p><div class="total"><span>Total</span><div><b>${money(priceFor(q))}</b></div></div><a class="bt pri big" href="${w}">Abrir WhatsApp</a></div>`;setTimeout(()=>location.href=w,1800)}}
 
 /* ---------- mis entradas (historial por evento) ---------- */
 async function mine(){
@@ -267,27 +259,97 @@ async function mine(){
     :`<div class="stub${t.checked_in?' used':''}"><div class="sl"><small>${e?esc(e.name):'La Previa'}</small><b>${esc(t.holder_name)}</b><span class="sd">${e?`${esc(fshort(e.d))} · ${ftime(e.d)}`:''}</span><div class="tkb">${tkBtns(t.qr_code)}</div></div><div class="perf"></div><div class="sr"><img data-q="${esc(t.qr_code)}" alt="Código QR de ${esc(t.holder_name)}"><span class="stat">${t.checked_in?'Ya ingresó':'Entrada válida'}</span></div></div>`;
   const box=(r,e)=>{const codes=r.status=='approved'?regTk(r,e):[];return `<div class="req"><div class="reqh">${chip(r.status)}<small>${r.quantity} entrada${r.quantity>1?'s':''}</small>${reqBtns(r,codes,true)}</div>${(r.tickets||[]).map(t=>stub(r,t,e)).join('')}
     <div class="songrow">${svg('note')}${(r.song_url||r.song_title)?(yt(r.song_url)?`<a class="song" href="${esc(r.song_url)}" target="_blank" rel="noopener"><span>${esc(r.song_title||'Canción de YouTube')}</span></a>`:`<span class="song"><span>${esc(r.song_title)}</span></span>`):'<span class="song mu"><span>Sin canción todavía</span></span>'}<button class="sm" data-tg="${r.id}">${(r.song_url||r.song_title)?'Cambiar':'Agregar'}</button></div>
-    <div class="songedit" data-ed2="${r.id}"><input data-su="${r.id}" value="${esc(r.song_url||'')}" placeholder="Pegá el enlace de YouTube de tu canción"><div class="r"><button class="sm pri" data-sv="${r.id}">Guardar canción</button></div><p class="sm" data-sm="${r.id}"></p></div></div>`};
+    <div class="songedit" data-ed2="${r.id}"><div data-pk="${r.id}"></div><p class="sm" data-sm="${r.id}"></p></div></div>`};
   const title=g=>g.e?`<div class="sec"><h2>Entradas para ${esc(g.e.name)}</h2><span class="cnt plain">${esc(fshort(g.e.d))} · ${ftime(g.e.d)}</span>${g.e.d.getTime()<Date.now()-12*36e5?'<span class="chip wait">Finalizado</span>':''}</div>`:'<div class="sec"><h2>Entradas anteriores</h2></div>';
-  main.innerHTML=(user.is_anonymous?'<div class="note">Pediste sin cuenta: estas entradas se guardan solo en este dispositivo, pero igual te las mandamos por WhatsApp. <a class="lk" data-reg="1">Crear cuenta</a></div>':'')+`<div class="sec" style="margin-top:6px"><h2>Mis entradas</h2><button id="rf" class="sm" style="margin-left:auto">↻ Actualizar</button></div>`+(groups.map(g=>title(g)+g.rs.map(r=>box(r,g.e)).join('')).join('')||'<div class="empty">Todavía no pediste entradas.<b>Cuando las pidas, van a aparecer acá.</b></div>');
+  main.innerHTML=(user.is_anonymous?'<div class="note">Pediste sin cuenta: estas entradas se guardan solo en este dispositivo, pero igual te las mandamos por WhatsApp. <a class="lk" data-reg="1">Crear cuenta</a></div>':'')+`<div class="sec" style="margin-top:6px"><h2>Mis entradas</h2><button id="rf" class="sm" style="margin-left:auto">↻ Actualizar</button></div>`+(groups.map(g=>title(g)+(g.e&&g.e.d.getTime()>Date.now()-12*36e5?actsHtml(g.e):'')+g.rs.map(r=>box(r,g.e)).join('')).join('')||'<div class="empty">Todavía no pediste entradas.<b>Cuando las pidas, van a aparecer acá.</b></div>');
   document.querySelectorAll('[data-q]').forEach(async i=>{
     try{
       if(typeof QRCode==='undefined'||typeof QRCode.toDataURL!=='function')throw new Error('la librería de QR no cargó (typeof QRCode = '+typeof QRCode+')');
       const u=await QRCode.toDataURL(i.dataset.q,{width:600,margin:3});qrUrls[i.dataset.q]=u;i.src=u}
     catch(e){console.error('QR',e);const s=document.createElement('span');s.className='bad';s.textContent='No se pudo generar el QR: '+((e&&e.message)||e);i.replaceWith(s)}});
-  main.onclick=e=>{if(e.target.closest('[data-reg]'))return authView('signup');const b=e.target.closest('button');if(!b)return;
-    if(tkClick(b)){}else if(b.dataset.sv)saveSong(b.dataset.sv);else if(b.dataset.tg){const w=document.querySelector(`[data-ed2="${b.dataset.tg}"]`);w.classList.toggle('open');if(w.classList.contains('open'))w.querySelector('input').focus()}else if(b.id=='rf')mine()}}
-async function saveSong(id){
-  const inp=document.querySelector(`[data-su="${id}"]`),m=document.querySelector(`[data-sm="${id}"]`),b=document.querySelector(`[data-sv="${id}"]`),
-    say=(c,t)=>{m.className='sm '+c;m.textContent=t},url=inp.value.trim();
-  if(!yt(url))return say('bad','Pegá un enlace de YouTube válido.');
-  b.disabled=true;say('','Buscando el título…');
-  const title=await getTitle(url);
-  if(!title){b.disabled=false;return say('bad','No pudimos leer el título de ese enlace. Revisá que el video exista.')}
-  const{error}=await sb.rpc('update_my_song',{p_request_id:String(id),p_url:url,p_title:title});
-  if(error){console.error(error);b.disabled=false;return say('bad','No se pudo guardar. Probá de nuevo.')}
-  await mine();const m2=document.querySelector(`[data-sm="${id}"]`);if(m2){m2.className='sm ok';m2.textContent='✔ Canción actualizada: '+title;m2.closest('.songedit').classList.add('open')}}
+  main.onclick=e=>{if(evActs(e))return;if(e.target.closest('[data-reg]'))return authView('signup');const b=e.target.closest('button');if(!b)return;
+    if(tkClick(b)){}else if(b.dataset.tg){const id=b.dataset.tg,w=document.querySelector(`[data-ed2="${id}"]`);w.classList.toggle('open');if(w.classList.contains('open')&&!w.dataset.m){w.dataset.m=1;mountPicker(w.querySelector('[data-pk]'),p=>{if(p)saveSong(id,p)})}}else if(b.id=='rf')mine()}}
+/* ---------- buscador de canciones (YouTube) ---------- */
+const dec=s=>{const t=document.createElement('textarea');t.innerHTML=s;return t.value};
+const SPK=C.YOUTUBE_API_KEY||'';
+async function ytSearch(q){
+  const ck='yts:'+q.toLowerCase();
+  try{const c=JSON.parse(localStorage.getItem(ck)||'null');if(c&&Date.now()-c.t<864e5)return c.v}catch(e){}
+  const r=await fetch('https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&maxResults=6&q='+encodeURIComponent(q)+'&key='+encodeURIComponent(SPK));
+  const d=await r.json();
+  if(!r.ok)throw new Error((d.error&&d.error.message)||('HTTP '+r.status));
+  const v=(d.items||[]).filter(i=>i.id&&i.id.videoId).map(i=>({id:i.id.videoId,title:dec(i.snippet.title),ch:dec(i.snippet.channelTitle),th:(i.snippet.thumbnails.medium||i.snippet.thumbnails.default).url}));
+  try{localStorage.setItem(ck,JSON.stringify({t:Date.now(),v}))}catch(e){}
+  return v}
+function mountPicker(root,onPick){
+  let picked=null,mode=SPK?'s':'l',list=[],seq=0,tm,cur=null;
+  root.innerHTML='<div class="pk"><div class="pk-in"></div><div class="pk-r"></div><a class="lk pk-t" role="button" tabindex="0"></a></div>';
+  const inb=root.querySelector('.pk-in'),res=root.querySelector('.pk-r'),tg=root.querySelector('.pk-t'),field=()=>inb.querySelector('.pq');
+  const drawIn=()=>{
+    if(picked){inb.innerHTML='';tg.hidden=true;return}
+    tg.hidden=!SPK;tg.textContent=mode==='s'?'Prefiero pegar un link':'Prefiero buscar por nombre';
+    inb.innerHTML=mode==='s'?`<div class="srch"><input class="pq" type="search" enterkeyhint="search" autocomplete="off" maxlength="80" placeholder="Ej: De música ligera Soda Stereo"><button type="button" class="pgo" aria-label="Buscar">${svg('search')}</button></div>`
+      :'<input class="pq" type="url" inputmode="url" autocomplete="off" placeholder="Pegá el link de YouTube">'};
+  const showList=()=>{res.innerHTML=list.map((x,i)=>`<button type="button" class="rs" data-i="${i}"><img src="${esc(x.th)}" alt="" loading="lazy"><span><b>${esc(x.title)}</b><small>${esc(x.ch)}</small></span></button>`).join('')};
+  const showPrev=x=>{cur=x;try{if(typeof jb!=='undefined'&&jb.on&&jb.pl)jb.pl.pauseVideo()}catch(e){}
+    res.innerHTML=`<div class="pv"><div class="pv-v"><iframe src="https://www.youtube-nocookie.com/embed/${esc(x.id)}?rel=0&playsinline=1" title="Vista previa" allow="encrypted-media; picture-in-picture" allowfullscreen></iframe></div><p class="pv-t">${esc(x.title)}</p><div class="pv-b"><button type="button" class="pri sm" data-ok>Sí, es esta</button><button type="button" class="sm" data-no>Elegir otra</button></div></div>`};
+  const showPicked=()=>{res.innerHTML=`<div class="picked"><img src="${thumb(picked.id)}" alt=""><div><small>Tu canción</small><b>${esc(picked.title)}</b></div><button type="button" class="sm" data-chg>Cambiar</button></div>`};
+  const doSearch=async()=>{
+    const q=(field()&&field().value||'').trim();
+    if(q.length<2){res.innerHTML='<p class="sm">Escribí el nombre de la canción y tocá buscar.</p>';return}
+    const my=++seq;res.innerHTML='<p class="sm">Buscando…</p>';
+    try{const l=await ytSearch(q);if(my!==seq)return;list=l;if(l.length)showList();else res.innerHTML='<p class="sm">No encontramos resultados. Probá con otro nombre.</p>'}
+    catch(e){if(my!==seq)return;console.error('yt',e);mode='l';drawIn();res.innerHTML='<p class="bad">La búsqueda no está disponible ahora. Pegá el link de la canción.</p>'}};
+  const doLink=async()=>{
+    const u=(field()&&field().value||'').trim(),my=++seq;
+    if(!u){res.innerHTML='';return}
+    if(!yt(u)||!vidId(u)){res.innerHTML='<p class="sm">Ese link no parece ser de YouTube.</p>';return}
+    res.innerHTML='<p class="sm">Buscando el video…</p>';
+    const title=(await getTitle(u))||'Canción de YouTube';if(my!==seq)return;showPrev({id:vidId(u),title})};
+  root.onclick=e=>{
+    const t=e.target;
+    if(t.closest('.pgo'))return doSearch();
+    if(t.closest('.pk-t')){mode=mode==='s'?'l':'s';res.innerHTML='';drawIn();return}
+    const r=t.closest('.rs');if(r)return showPrev(list[+r.dataset.i]);
+    if(t.closest('[data-ok]')){picked={id:cur.id,title:cur.title};drawIn();showPicked();if(onPick)onPick(picked);return}
+    if(t.closest('[data-no]')){if(mode==='s'&&list.length)showList();else res.innerHTML='';return}
+    if(t.closest('[data-chg]')){picked=null;res.innerHTML='';drawIn();if(onPick)onPick(null);const f=field();if(f)f.focus()}};
+  root.onkeydown=e=>{
+    if(e.key==='Enter'&&e.target.classList.contains('pq')){e.preventDefault();if(mode==='s')doSearch();else doLink()}
+    if((e.key==='Enter'||e.key===' ')&&e.target.classList.contains('pk-t')){e.preventDefault();e.target.click()}};
+  root.oninput=e=>{if(mode==='l'&&e.target.classList.contains('pq')){clearTimeout(tm);tm=setTimeout(doLink,500)}};
+  drawIn();
+  return{get:()=>picked,pending:()=>{const f=field();return !picked&&!!(f&&f.value.trim())}}}
+async function saveSong(id,p){
+  const m=document.querySelector(`[data-sm="${id}"]`),say=(c,t)=>{m.className='sm '+c;m.textContent=t};
+  say('','Guardando…');
+  const{error}=await sb.rpc('update_my_song',{p_request_id:String(id),p_url:'https://www.youtube.com/watch?v='+p.id,p_title:p.title});
+  if(error){console.error(error);return say('bad','No se pudo guardar. Probá de nuevo.')}
+  await mine();const m2=document.querySelector(`[data-sm="${id}"]`);if(m2){m2.className='sm ok';m2.textContent='✔ Canción actualizada: '+p.title;m2.closest('.songedit').classList.add('open')}}
+
+/* ---------- invitar amigos y calendario ---------- */
+const siteUrl=()=>C.SITE_URL||location.origin+location.pathname.replace(/index\.html$/,'');
+const utc=d=>d.toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,'');
+const evEnd=e=>new Date(e.d.getTime()+(C.DURACION_HS||6)*36e5);
+const icsEsc=s=>String(s||'').replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\r?\n/g,'\\n');
+function invite(e){
+  const text=`¡Vení a ${e.name}! ${capF(fdate(e.d).replace(',',''))} · ${ftime(e.d)}${e.address?' · '+e.address:''}. Pedí tu entrada acá:`,url=siteUrl();
+  if(navigator.share){navigator.share({title:e.name,text,url}).catch(()=>{});return}
+  window.open('https://wa.me/?text='+encodeURIComponent(text+' '+url),'_blank','noopener')}
+const gcal=e=>'https://calendar.google.com/calendar/render?action=TEMPLATE&text='+encodeURIComponent(e.name)+'&dates='+utc(e.d)+'/'+utc(evEnd(e))+'&details='+encodeURIComponent('Entradas y más info: '+siteUrl())+(e.address?'&location='+encodeURIComponent(e.address):'');
+function icsDownload(e){
+  const L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//La Previa//ES','CALSCALE:GREGORIAN','BEGIN:VEVENT','UID:'+e.id+'@la-previa','DTSTAMP:'+utc(new Date()),'DTSTART:'+utc(e.d),'DTEND:'+utc(evEnd(e)),'SUMMARY:'+icsEsc(e.name),...(e.address?['LOCATION:'+icsEsc(e.address)]:[]),'DESCRIPTION:'+icsEsc('Entradas y más info: '+siteUrl()),'BEGIN:VALARM','TRIGGER:-P1D','ACTION:DISPLAY','DESCRIPTION:'+icsEsc('Mañana: '+e.name),'END:VALARM','END:VEVENT','END:VCALENDAR'];
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([L.join('\r\n')],{type:'text/calendar;charset=utf-8'}));a.download='La-Previa.ics';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000)}
+const actsHtml=e=>`<div class="actw"><div class="acts"><button type="button" class="bt sm" data-inv="${e.id}">${svg('share')}Invitar amigos</button><button type="button" class="bt sm" data-cal="${e.id}">${svg('cal')}Agregar al calendario</button></div><div class="calopt" hidden><a class="bt sm" href="${gcal(e)}" target="_blank" rel="noopener">Google Calendar</a><button type="button" class="bt sm" data-ics="${e.id}">Apple / Outlook (.ics)</button></div></div>`;
+function evActs(t){
+  const x=t.target.closest('[data-inv],[data-cal],[data-ics]');if(!x)return false;
+  const e=EV.find(v=>v.id==(x.dataset.inv||x.dataset.cal||x.dataset.ics));if(!e)return true;
+  if(x.dataset.inv)invite(e);else if(x.dataset.cal){const o=x.closest('.actw').querySelector('.calopt');o.hidden=!o.hidden}else icsDownload(e);
+  return true}
 /* ---------- entradas como imagen: QR + nombre + evento + fecha ---------- */
+const PR=C.PRECIOS||{1:12000,2:23000,3:33000,4:40000},PR5=C.PRECIO_5_MAS||10000;
+const priceFor=q=>PR[q]!==undefined?PR[q]:q*PR5;
+const money=n=>'$'+Number(n).toLocaleString('es-AR');
 const TKR={},RQR={},TKB={};
 const waNum=s=>{let d=String(s||'').replace(/\D/g,'');if(!d)return'';if(d.startsWith('00'))d=d.slice(2);if(d.startsWith('549'))return d;if(d.startsWith('54'))return '549'+d.slice(2).replace(/^9/,'');d=d.replace(/^0/,'');if(d.length===12&&/^\d{2,4}15\d{6,8}$/.test(d))d=d.replace(/^(\d{2,4})15/,'$1');return d.length===10?'549'+d:d};
 const waRow=(r,e)=>{if(!r.contact)return'';const n=waNum(r.contact),nm=r.profiles?.display_name||'',txt=`¡Hola ${nm}! Acá están tus entradas para ${e&&e.name?e.name:'La Previa'}${e&&e.d?' del '+fshort(e.d)+' a las '+ftime(e.d):''}. Presentá el QR en la puerta. ¡Nos vemos!`;
@@ -357,11 +419,11 @@ async function admin(){
   const sold=[...AEV,{id:null,name:'Sin evento'}].map(e=>{const ap=data.filter(r=>r.status=='approved'&&(r.event_id||null)==(e.id||null));if(!ap.length)return'';
     const tk=ap.flatMap(r=>r.tickets),ing=tk.filter(t=>t.checked_in).length;
     return `<div class="grp">Entradas vendidas · ${esc(e.name)}${e.d?' '+fshort(e.d):''}<span class="cnt">${ing}/${tk.length} ingresaron</span></div>`+ap.map(r=>{const codes=regTk(r,e.d?e:null);
-      return `<div class="box" id="rq-${r.id}"><div class="reqh"><b>${esc(r.profiles?.display_name)}</b><small>${r.tickets.length} entrada${r.tickets.length>1?'s':''}</small>${reqBtns(r,codes,true)}${CAN&&codes.length===1?`<button class="sm" data-sha="${r.id}">${svg('share')}Compartir</button>`:''}</div>${waRow(r,e.d?e:null)}${r.tickets.map(t=>`<div class="ct"><input type="checkbox" disabled ${t.checked_in?'checked':''}><span>${esc(t.holder_name)}</span>${t.qr_code?`<button class="ed sm" data-dl="${esc(t.qr_code)}">${svg('download')}Descargar</button>`:''}</div>`).join('')}</div>`}).join('')}).join('');
+      return `<div class="box" id="rq-${r.id}"><div class="reqh"><b>${esc(r.profiles?.display_name)}</b><small>${r.tickets.length} entrada${r.tickets.length>1?'s':''} · ${money(priceFor(r.tickets.length))}</small>${reqBtns(r,codes,true)}${CAN&&codes.length===1?`<button class="sm" data-sha="${r.id}">${svg('share')}Compartir</button>`:''}</div>${waRow(r,e.d?e:null)}${r.tickets.map(t=>`<div class="ct"><input type="checkbox" disabled ${t.checked_in?'checked':''}><span>${esc(t.holder_name)}</span>${t.qr_code?`<button class="ed sm" data-dl="${esc(t.qr_code)}">${svg('download')}Descargar</button>`:''}</div>`).join('')}</div>`}).join('')}).join('');
   const cur=AEV.find(e=>e.id==editId);if(!cur)editId=null;
-  main.innerHTML=`<div class="box"><button id="sc" class="pri">📷 Escanear entrada</button><div id="rd"></div><div id="res"></div></div>`+`<div class="grp">Pendientes ( ${pe.length} )</div>`+(pe.length?'':'<div class="empty">No hay solicitudes pendientes.</div>')+pe.map(r=>`<div class="box"><b>${esc(r.profiles?.display_name)}</b> · ${r.quantity} entrada(s) · <small>${evName(r.event_id)}</small><br>${r.tickets.map(t=>esc(t.holder_name)).join(', ')}${r.contact?`<br>WhatsApp: ${esc(r.contact)}`:''}<br>${r.song_title?'♪ '+esc(r.song_title):'<small>Sin canción</small>'}<br><br><button data-id="${r.id}" data-st="approved" class="pri sm">Aprobar</button> <button data-id="${r.id}" data-st="rejected" class="sm danger">Rechazar</button></div>`).join('')+sold+`  <div class="box" id="evf"><b>${cur?'✏️ Editar evento':'➕ Crear evento'}</b><label>Nombre</label><input id="en" value="${esc(cur?cur.name:'La Previa')}" maxlength="60"><label>Fecha y hora</label><input id="ed" type="datetime-local" value="${cur?loc(cur.d):''}"><label>Dirección</label><input id="ea" maxlength="120" placeholder="Calle y número, ciudad" value="${esc(cur?cur.address||'':'')}"><label>Cantidad de entradas a la venta</label><input id="ec" type="number" min="1" inputmode="numeric" placeholder="Ej: 150" value="${cur?cur.capacity:''}"><button id="ecb" class="pri">${cur?'Guardar cambios':'Crear evento'}</button>${cur?' <button id="ecc" class="sm">Cancelar</button>':''}<p id="eer" class="bad"></p></div>
+  main.innerHTML=`<div class="box"><button id="sc" class="pri">📷 Escanear entrada</button><div id="rd"></div><div id="res"></div></div>`+`<div class="grp">Pendientes ( ${pe.length} )</div>`+(pe.length?'':'<div class="empty">No hay solicitudes pendientes.</div>')+pe.map(r=>`<div class="box"><b>${esc(r.profiles?.display_name)}</b> · ${r.quantity} entrada(s) · <b>${money(priceFor(r.quantity))}</b> · <small>${evName(r.event_id)}</small><br>${r.tickets.map(t=>esc(t.holder_name)).join(', ')}${r.contact?`<br>WhatsApp: ${esc(r.contact)}`:''}<br>${r.song_title?'♪ '+esc(r.song_title):'<small>Sin canción</small>'}<br><br><button data-id="${r.id}" data-st="approved" class="pri sm">Aprobar</button> <button data-id="${r.id}" data-st="rejected" class="sm danger">Rechazar</button></div>`).join('')+sold+`  <div class="box" id="evf"><b>${cur?'✏️ Editar evento':'➕ Crear evento'}</b><label>Nombre</label><input id="en" value="${esc(cur?cur.name:'La Previa')}" maxlength="60"><label>Fecha y hora</label><input id="ed" type="datetime-local" value="${cur?loc(cur.d):''}"><label>Dirección</label><input id="ea" maxlength="120" placeholder="Calle y número, ciudad" value="${esc(cur?cur.address||'':'')}"><label>Cantidad de entradas a la venta</label><input id="ec" type="number" min="1" inputmode="numeric" placeholder="Ej: 150" value="${cur?cur.capacity:''}"><button id="ecb" class="pri">${cur?'Guardar cambios':'Crear evento'}</button>${cur?' <button id="ecc" class="sm">Cancelar</button>':''}<p id="eer" class="bad"></p></div>
   <div class="grp">Eventos</div>${ev.error?`<p class="bad ct">Falta ejecutar eventos.sql en Supabase (${esc(ev.error.message)})</p>`:AEV.map(stat).join('')||'<p class="ct">Todavía no creaste ningún evento.</p>'}
-  <div class="box"><b>🎶 Rocola</b><p class="sm">Pegá uno o varios enlaces de YouTube (uno por línea). Suenan al azar junto con las canciones que eligen los invitados con entrada aprobada.</p><textarea id="jl" rows="3" placeholder="https://www.youtube.com/watch?v=..."></textarea><button id="jla" class="pri">Agregar a la rocola</button><p id="jer" class="bad"></p>${jk.error?`<p class="bad">Falta ejecutar rocola.sql en Supabase (${esc(jk.error.message)})</p>`:(jk.data||[]).map(x=>`<div class="ct"><span>♪ ${esc(x.title)}</span><button class="ed sm" data-jd="${x.id}">✕</button></div>`).join('')||'<p class="sm">Todavía no agregaste canciones.</p>'}</div>`;
+  <div class="box"><b>🎶 ${esc(MN)}</b><p class="sm">Pegá uno o varios enlaces de YouTube (uno por línea). Suenan al azar junto con las canciones que eligen los invitados con entrada aprobada.</p><textarea id="jl" rows="3" placeholder="https://www.youtube.com/watch?v=..."></textarea><button id="jla" class="pri">Agregar ${ALA} ${esc(mn)}</button><p id="jer" class="bad"></p>${jk.error?`<p class="bad">Falta ejecutar rocola.sql en Supabase (${esc(jk.error.message)})</p>`:(jk.data||[]).map(x=>`<div class="ct"><span>♪ ${esc(x.title)}</span><button class="ed sm" data-jd="${x.id}">✕</button></div>`).join('')||'<p class="sm">Todavía no agregaste canciones.</p>'}</div>`;
   main.onclick=async e=>{
     const tb=e.target.closest('button');if(tb&&tkClick(tb))return;
     const ed=e.target.closest('[data-ed]');if(ed){editId=ed.dataset.ed;await admin();$('#evf').scrollIntoView({behavior:'smooth',block:'center'});return}
@@ -384,7 +446,7 @@ async function admin(){
     const er=(m,c='bad')=>{$('#jer').className=c;$('#jer').textContent=m},urls=$('#jl').value.split(/\s+/).filter(Boolean),seen=new Set((jk.data||[]).map(x=>vidId(x.url)));
     if(!urls.length)return er('Pegá al menos un enlace de YouTube.');
     const ok=urls.filter(u=>{const v=vidId(u);if(!yt(u)||!v||seen.has(v))return false;seen.add(v);return true});
-    if(!ok.length)return er('Esos enlaces no son válidos o ya están en la rocola.');
+    if(!ok.length)return er(`Esos enlaces no son válidos o ya están en ${LA} ${mn}.`);
     $('#jla').disabled=true;er('Buscando los títulos…','sm');
     const rows=await Promise.all(ok.map(async u=>({url:u,title:(await getTitle(u))||'Canción de YouTube'})));
     const{error}=await sb.from('jukebox').insert(rows);
@@ -432,7 +494,7 @@ function playSong(s){
   if(!jb.bag.length&&jb.list.length>1)fillBag();
   if($('#jf')){$('#jf').style.width='0';$('#jc').textContent='0:00';$('#jd').textContent='0:00'}
   drawJuke();
-  try{if('mediaSession' in navigator){navigator.mediaSession.metadata=new MediaMetadata({title:s.title,artist:'La Previa · Rocola',artwork:[{src:thumb(id),sizes:'320x180',type:'image/jpeg'}]});
+  try{if('mediaSession' in navigator){navigator.mediaSession.metadata=new MediaMetadata({title:s.title,artist:'La Previa · '+MN,artwork:[{src:thumb(id),sizes:'320x180',type:'image/jpeg'}]});
     navigator.mediaSession.setActionHandler('play',()=>jb.pl&&jb.pl.playVideo());navigator.mediaSession.setActionHandler('pause',()=>jb.pl&&jb.pl.pauseVideo());navigator.mediaSession.setActionHandler('nexttrack',()=>playSong(pick()))}}catch(e){}
   ytReady(()=>{
     if(jb.pl&&jb.pl.loadVideoById){jb.pl.loadVideoById(id);return}
@@ -458,7 +520,7 @@ function upJuke(){
   const j=$('#juke');if(!j)return;
   j.classList.toggle('play',jb.on);j.classList.toggle('has',!!jb.cur);
   const id=jb.cur&&vidId(jb.cur.url);
-  $('#jk').textContent=jb.err?'Aviso':jb.cur?(jb.on?'Sonando ahora':'En pausa'):'Rocola';
+  $('#jk').textContent=jb.err?'Aviso':jb.cur?(jb.on?'Sonando ahora':'En pausa'):MN;
   $('#jt').textContent=jb.err||(jb.cur?jb.cur.title:'Tocá play para escuchar música');
   $('#jby').textContent=!jb.err&&jb.cur&&jb.cur.by?'Pedida por '+jb.cur.by:'';
   const lb=j.querySelector('.lb'),u=id?thumb(id):'';
@@ -472,7 +534,7 @@ function upMini(){
   if(!jb.cur){m.hidden=true;return}
   m.hidden=false;m.classList.toggle('play',jb.on);
   const id=vidId(jb.cur.url);
-  if(!m.firstChild){m.innerHTML='<div class="mt"></div><div class="mi"><small>Rocola</small><b></b></div><button aria-label="Reproducir/Pausar"></button>';
+  if(!m.firstChild){m.innerHTML='<div class="mt"></div><div class="mi"><small>'+esc(MN)+'</small><b></b></div><button aria-label="Reproducir/Pausar"></button>';
     m.querySelector('.mi').onclick=()=>go('home');
     m.querySelector('button').onclick=()=>{if(!jb.pl)return;if(jb.on)jb.pl.pauseVideo();else jb.pl.playVideo()}}
   m.querySelector('.mt').style.backgroundImage=id?`url(${thumb(id)})`:'';
