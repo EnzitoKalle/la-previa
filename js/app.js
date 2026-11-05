@@ -453,7 +453,12 @@ async function admin(){
     if(error){console.error(error);$('#jla').disabled=false;return er('No se pudo agregar ('+error.message+')')}
     await loadJuke();admin()};
   $('#sc').onclick=scan}
-const otherEv=t=>{const e=AEV.find(x=>x.id==t.requests?.event_id);return e&&Math.abs(Date.now()-e.d.getTime())>24*36e5?e:null};
+/* Solo bloquea entradas de OTRO evento (el más cercano a hoy es el "actual") o de uno que ya pasó. Probar antes de la fecha funciona. */
+const evCheck=t=>{const e=AEV.find(x=>x.id==t.requests?.event_id);if(!e)return null;
+  const now=Date.now(),dist=x=>Math.abs(x.d.getTime()-now),cur=AEV.reduce((a,x)=>dist(x)<dist(a)?x:a,AEV[0]);
+  if(e.id!==cur.id)return{e,msg:'⚠️ Entrada de otro evento'};
+  if(e.d.getTime()<now-24*36e5)return{e,msg:'⚠️ Esta entrada es de un evento que ya pasó'};
+  return null};
 async function scan(){
   const res=$('#res');res.textContent='';
   if(typeof Html5Qrcode==='undefined'){
@@ -465,9 +470,9 @@ async function scan(){
   h.start({facingMode:'environment'},{fps:10,qrbox:220},async txt=>{
     await h.stop();const{data:t,error}=await sb.from('tickets').select('*,requests(status,event_id)').eq('qr_code',txt).maybeSingle();
     if(error||!t||t.requests?.status!='approved')res.innerHTML='<p class="bad">❌ QR inválido</p>';
-    else if(otherEv(t))res.innerHTML=`<p class="bad">⚠️ Entrada de otro evento: ${esc(otherEv(t).name)} (${fshort(otherEv(t).d)})</p>`;
+    else if(evCheck(t)){const c=evCheck(t);res.innerHTML=`<p class="bad">${c.msg}: ${esc(c.e.name)} (${fshort(c.e.d)})</p>`}
     else if(t.checked_in)res.innerHTML=`<p class="bad">⚠️ ${esc(t.holder_name)} ya ingresó</p>`;
-    else{await sb.from('tickets').update({checked_in:true,checked_in_at:new Date().toISOString()}).eq('id',t.id);res.innerHTML=`<p class="ok">✔ Entrada válida: ${esc(t.holder_name)}</p>`}
+    else{await sb.from('tickets').update({checked_in:true,checked_in_at:new Date().toISOString()}).eq('id',t.id);res.innerHTML=`<p class="ok">✔ Entrada válida: ${esc(t.holder_name)}</p>`;const ev=AEV.find(x=>x.id==t.requests?.event_id);if(ev&&ev.d.getTime()-Date.now()>24*36e5)res.innerHTML+=`<p class="sm">Ojo: este evento es el ${esc(fshort(ev.d))}.</p>`}
     res.innerHTML+='<button id="again">Escanear otra</button>';$('#again').onclick=()=>admin().then(scan)},()=>{}).catch(()=>res.innerHTML='<p class="bad">No se pudo abrir la cámara. Dale permiso al navegador.</p>')}
 async function badge(){
   if(!isAdmin())return;const{count}=await sb.from('requests').select('id',{count:'exact',head:true}).eq('status','pending');
