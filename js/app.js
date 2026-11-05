@@ -208,15 +208,15 @@ async function renderForm(ev){
   ${acct()?'':'<p class="hello">No necesitás cuenta: te mandamos las entradas por WhatsApp apenas las aprobemos.</p>'}
   <div class="evmini${showEv?'':' dup'}"><b>${esc(ev.name)}</b><div class="evd">${evInfo(ev)}</div>${evPill(ev)}</div>
   <label>Tu nombre en la lista</label><input id="dn" maxlength="30" value="${esc(p?.display_name||user?.user_metadata?.full_name||'')}">
-  <label>Cantidad de entradas</label><div class="step"><button type="button" id="qm" aria-label="Menos">−</button><b id="qv">1</b><button type="button" id="qp" aria-label="Más">+</button><small>máx. ${max}</small></div><div class="prices" id="pr">${[1,2,3,4].map(n=>`<span data-t="${n}"><b>${n} entrada${n>1?'s':''}</b><em>${money(priceFor(n))}</em></span>`).join('')}<span data-t="5"><b>5 o más</b><em>${money(PR5)} c/u</em></span></div>
+  <label>Cantidad de entradas</label><div class="step"><button type="button" id="qm" aria-label="Menos">−</button><b id="qv">1</b><button type="button" id="qp" aria-label="Más">+</button><small>máx. ${max}</small></div><div class="prices" id="pr">${[1,2,3,4].map(n=>`<button type="button" data-t="${n}"><b>${n} entrada${n>1?'s':''}</b><em>${money(priceFor(n))}</em></button>`).join('')}<button type="button" data-t="5"><b>5 o más</b><em>${money(PR5)} c/u</em></button></div>
   <div class="total"><span>Total</span><div><b id="tot"></b><small id="each"></small></div></div><div id="nm"></div>
   <label>Tu WhatsApp<span class="opt">para enviarte las entradas</span></label><input id="ct" type="tel" inputmode="tel" autocomplete="tel" maxlength="30" placeholder="Ej: 2262 123456">
   <label>Pedile tu canción al DJ<span class="opt">Opcional</span></label><p class="hint">${SPK?'Buscala por nombre y elegí el video.':'Pegá el link de YouTube de la canción.'} Se suma ${ALA} ${esc(mn)} de la fiesta cuando aprobemos tu entrada.</p><div id="pkr"></div>
   <br><button id="go" class="pri big">Enviar solicitud</button><p id="er"></p></div>`;
   const names=()=>{const old=[...document.querySelectorAll('.nm')].map(i=>i.value);$('#nm').innerHTML=Array.from({length:qty},(_,i)=>`<input class="nm" placeholder="Nombre y apellido de la entrada ${i+1}" maxlength="40" value="${esc(old[i]||'')}">`).join('')};
-  const price=()=>{const t=priceFor(qty);$('#tot').textContent=money(t);$('#each').textContent=qty>1?`${money(Math.round(t/qty))} c/u`:'';document.querySelectorAll('#pr [data-t]').forEach(x=>x.classList.toggle('on',+x.dataset.t===(qty>=5?5:qty)))};
+  const price=()=>{const t=priceFor(qty);$('#tot').textContent=money(t);$('#each').textContent=qty>1?`${money(Math.round(t/qty))} c/u`:'';document.querySelectorAll('#pr [data-t]').forEach(x=>{const on=+x.dataset.t===(qty>=5?5:qty);x.classList.toggle('on',on);x.setAttribute('aria-pressed',on);x.disabled=+x.dataset.t>max})};
   const setQ=n=>{qty=Math.min(max,Math.max(1,n));$('#qv').textContent=qty;names();price()};
-  names();price();$('#qm').onclick=()=>setQ(qty-1);$('#qp').onclick=()=>setQ(qty+1);
+  names();price();$('#pr').onclick=e=>{const b=e.target.closest('[data-t]');if(!b||b.disabled)return;const n=+b.dataset.t;setQ(n===5&&qty>=5?qty:n)};$('#qm').onclick=()=>setQ(qty-1);$('#qp').onclick=()=>setQ(qty+1);
   const pk=mountPicker($('#pkr'));
   $('#go').onclick=async()=>{
     const dn=$('#dn').value.trim(),q=qty,ns=[...document.querySelectorAll('.nm')].map(i=>i.value.trim()),sel=pk.get(),su=sel?'https://www.youtube.com/watch?v='+sel.id:'',er=m=>$('#er').textContent=m;
