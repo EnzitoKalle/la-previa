@@ -23,7 +23,7 @@ const ICO={
  note:'<path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/>',
  play:'<path d="M7 4.5v15l12.5-7.5z" fill="currentColor" stroke="none"/>',
  pause:'<rect x="6" y="4.5" width="4.2" height="15" rx="1.2" fill="currentColor" stroke="none"/><rect x="13.8" y="4.5" width="4.2" height="15" rx="1.2" fill="currentColor" stroke="none"/>',
- next:'<path d="M5 5v14l10-7z" fill="currentColor" stroke="none"/><path d="M19 5v14"/>',
+ prev:'<path d="M19 5v14l-10-7z" fill="currentColor" stroke="none"/><path d="M5 5v14"/>',rew:'<path d="M11 6v12l-8-6z" fill="currentColor" stroke="none"/><path d="M21 6v12l-8-6z" fill="currentColor" stroke="none"/>',ffw:'<path d="M13 6v12l8-6z" fill="currentColor" stroke="none"/><path d="M3 6v12l8-6z" fill="currentColor" stroke="none"/>',mute:'<path d="M11 5 6.5 9H3v6h3.5L11 19z"/><path d="m16 9.5 5 5M21 9.5l-5 5"/>',next:'<path d="M5 5v14l10-7z" fill="currentColor" stroke="none"/><path d="M19 5v14"/>',
  vol:'<path d="M11 5 6.5 9H3v6h3.5L11 19z"/><path d="M15 9a4.2 4.2 0 0 1 0 6M17.8 6.2a8 8 0 0 1 0 11.6"/>',
  shuffle:'<path d="M3 7h3.5c5 0 5 10 10 10H21M3 17h3.5c1.4 0 2.5-.6 3.4-1.6M14 8.4c.8-.9 1.8-1.4 3-1.4H21"/><path d="m18.5 4.5 2.5 2.5-2.5 2.5M18.5 14.5l2.5 2.5-2.5 2.5"/>',
  phone:'<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/>',
@@ -481,7 +481,7 @@ async function badge(){
 setInterval(badge,30000);
 /* ---------- rocola: canciones al azar, solo suena cuando la persona toca ▶ ---------- */
 const vidId=u=>(String(u).match(/(?:v=|youtu\.be\/|shorts\/|embed\/)([\w-]{11})/)||[])[1];
-const jb={list:[],bag:[],cur:null,pl:null,on:false,fails:0,q:[],api:0,timer:0,err:''};
+const jb={hist:[],mute:false,list:[],bag:[],cur:null,pl:null,on:false,fails:0,q:[],api:0,timer:0,err:''};
 function loadYT(){if(jb.api||(window.YT&&YT.Player))return;jb.api=1;
   window.onYouTubeIframeAPIReady=()=>{jb.q.splice(0).forEach(f=>f())};
   const t=document.createElement('script');t.src='https://www.youtube.com/iframe_api';t.onerror=()=>{jb.api=0;jb.err='No se pudo cargar el reproductor.';drawJuke()};document.head.appendChild(t)}
@@ -494,18 +494,23 @@ function fillBag(){
   if(a.length>1&&jb.cur&&jb.list[a[a.length-1]].url===jb.cur.url)[a[0],a[a.length-1]]=[a[a.length-1],a[0]];
   jb.bag=a}
 function pick(){if(!jb.list.length)return null;if(!jb.bag.length)fillBag();return jb.list[jb.bag.pop()]}
-function playSong(s){
-  if(!s)return;jb.cur=s;jb.err='';clearTimeout(jb.timer);const id=vidId(s.url);
+function prevSong(){
+  let t=0;try{t=jb.pl&&jb.pl.getCurrentTime?jb.pl.getCurrentTime():0}catch(x){}
+  if(t>3||!jb.hist.length){try{jb.pl.seekTo(0,true)}catch(x){}return}
+  playSong(jb.hist.pop(),true)}
+function skip(d){try{if(!jb.pl||!jb.pl.getCurrentTime)return;const du=jb.pl.getDuration()||0,t=jb.pl.getCurrentTime()+d;jb.pl.seekTo(Math.max(0,du?Math.min(du-1,t):t),true)}catch(x){}}
+function playSong(s,back){
+  if(!s)return;if(!back&&jb.cur&&jb.cur!==s){jb.hist.push(jb.cur);if(jb.hist.length>30)jb.hist.shift()}jb.cur=s;jb.err='';clearTimeout(jb.timer);const id=vidId(s.url);
   if(!jb.bag.length&&jb.list.length>1)fillBag();
   if($('#jf')){$('#jf').style.width='0';$('#jc').textContent='0:00';$('#jd').textContent='0:00'}
   drawJuke();
   try{if('mediaSession' in navigator){navigator.mediaSession.metadata=new MediaMetadata({title:s.title,artist:'La Previa · '+MN,artwork:[{src:thumb(id),sizes:'320x180',type:'image/jpeg'}]});
-    navigator.mediaSession.setActionHandler('play',()=>jb.pl&&jb.pl.playVideo());navigator.mediaSession.setActionHandler('pause',()=>jb.pl&&jb.pl.pauseVideo());navigator.mediaSession.setActionHandler('nexttrack',()=>playSong(pick()))}}catch(e){}
+    navigator.mediaSession.setActionHandler('play',()=>jb.pl&&jb.pl.playVideo());navigator.mediaSession.setActionHandler('pause',()=>jb.pl&&jb.pl.pauseVideo());navigator.mediaSession.setActionHandler('nexttrack',()=>playSong(pick()));navigator.mediaSession.setActionHandler('previoustrack',prevSong)}}catch(e){}
   ytReady(()=>{
     if(jb.pl&&jb.pl.loadVideoById){jb.pl.loadVideoById(id);return}
     $('#mp').innerHTML='<div id="yp"></div>';
     jb.pl=new YT.Player('yp',{width:1,height:1,videoId:id,playerVars:{autoplay:1,playsinline:1,rel:0},events:{
-      onReady:e=>{try{e.target.setVolume(jb.vol)}catch(x){}e.target.playVideo()},
+      onReady:e=>{try{e.target.setVolume(jb.vol);if(jb.mute)e.target.mute()}catch(x){}e.target.playVideo()},
       onStateChange:e=>{const st=e.data;
         if(st===1){jb.on=true;jb.fails=0;jb.err='';clearTimeout(jb.timer)}
         else if(st===2)jb.on=false;
@@ -513,13 +518,18 @@ function playSong(s){
         drawJuke()},
       onError:()=>{jb.fails++;if(jb.fails<jb.list.length)playSong(pick());else{jb.on=false;jb.err='No se pudieron reproducir las canciones.';drawJuke()}}}})});
   jb.timer=setTimeout(()=>{if(!jb.on){jb.err='Tocá play para empezar';drawJuke()}},5000)}
-const mkJuke=()=>`<div id="juke"><div class="jrow"><div class="vinyl"><div class="lb"></div></div><div class="jinfo"><span class="jkrow"><span class="jk" id="jk"></span><span class="eq" aria-hidden="true">${Array.from({length:5},(_,i)=>`<i style="--i:${i}"></i>`).join('')}</span></span><b id="jt"></b><span class="jby" id="jby"></span></div><button id="jp" class="pri" aria-label="Reproducir"></button></div>
+const mkJuke=()=>`<div id="juke"><div class="djtop"><span class="djn">${svg('note')} ${esc(MN)} · La Previa</span><span class="vu" aria-hidden="true">${Array.from({length:16},(_,i)=>`<i style="--i:${i}"></i>`).join('')}</span></div>
+  <div class="jrow"><div class="vinyl"><div class="lb"></div></div><div class="jinfo lcd"><span class="jk" id="jk"></span><b id="jt"></b><span class="jby" id="jby"></span></div></div>
   <div class="jbar"><span id="jc">0:00</span><div class="jtr" id="jtr"><div class="jf" id="jf"></div></div><span id="jd">0:00</span></div>
-  <div class="jfoot"><span class="jnext" id="jn"></span><button id="jx" aria-label="Siguiente canción">${svg('next')}</button><label class="vol" title="Volumen">${svg('vol')}<input id="jv" type="range" min="0" max="100" value="${jb.vol}" aria-label="Volumen"></label></div></div>`;
+  <div class="ctl"><button id="jpv" aria-label="Canción anterior">${svg('prev')}</button><button id="jrw" aria-label="Retroceder 10 segundos">${svg('rew')}<small>10</small></button><button id="jp" class="pri" aria-label="Reproducir"></button><button id="jff" aria-label="Adelantar 10 segundos">${svg('ffw')}<small>10</small></button><button id="jx" aria-label="Siguiente canción">${svg('next')}</button></div>
+  <div class="jfoot"><button id="jm" class="mu" aria-label="Silenciar"></button><input id="jv" class="fd" type="range" min="0" max="100" value="${jb.vol}" aria-label="Volumen"><b id="jvn" class="vn"></b></div><span class="jnext" id="jn"></span></div>`;
 function bindJuke(){
   $('#jp').onclick=()=>{if(!jb.cur)return playSong(pick());if(!jb.pl)return;if(jb.on)jb.pl.pauseVideo();else jb.pl.playVideo()};
   $('#jx').onclick=()=>playSong(pick());
-  $('#jv').oninput=e=>{jb.vol=+e.target.value;try{jb.pl&&jb.pl.setVolume&&jb.pl.setVolume(jb.vol)}catch(x){}};
+  $('#jpv').onclick=()=>{if(!jb.cur)return playSong(pick());prevSong()};
+  $('#jrw').onclick=()=>skip(-10);$('#jff').onclick=()=>skip(10);
+  $('#jm').onclick=()=>{jb.mute=!jb.mute;try{if(jb.pl){if(jb.mute)jb.pl.mute();else{jb.pl.unMute();jb.pl.setVolume(jb.vol)}}}catch(x){}upJuke()};
+  $('#jv').oninput=e=>{jb.vol=+e.target.value;if(jb.mute){jb.mute=false;try{jb.pl.unMute()}catch(x){}}try{jb.pl&&jb.pl.setVolume&&jb.pl.setVolume(jb.vol)}catch(x){}upJuke()};
   $('#jtr').onclick=e=>{try{if(!jb.pl||!jb.pl.getDuration)return;const d=jb.pl.getDuration(),r=e.currentTarget.getBoundingClientRect();if(d>0)jb.pl.seekTo(Math.min(1,Math.max(0,(e.clientX-r.left)/r.width))*d,true)}catch(x){}}}
 function upJuke(){
   const j=$('#juke');if(!j)return;
@@ -531,6 +541,7 @@ function upJuke(){
   const lb=j.querySelector('.lb'),u=id?thumb(id):'';
   if(lb.dataset.u!==u){lb.dataset.u=u;lb.style.backgroundImage=u?`url(${u})`:''}
   $('#jp').innerHTML=svg(jb.on?'pause':'play');$('#jp').setAttribute('aria-label',jb.on?'Pausar':'Reproducir');
+  const mm=$('#jm');mm.innerHTML=svg(jb.mute?'mute':'vol');mm.classList.toggle('off',!!jb.mute);$('#jvn').textContent=jb.mute?'MUTE':jb.vol;$('#jv').style.setProperty('--v',(jb.mute?0:jb.vol)+'%');
   const nx=jb.bag.length?jb.list[jb.bag[jb.bag.length-1]]:null;
   $('#jn').textContent=nx?'Sigue: '+nx.title:'';
   upMini()}
